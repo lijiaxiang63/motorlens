@@ -43,6 +43,14 @@ export const HAND_SCALE_MEDIAN_WINDOW = 15
  */
 export const HAND_SCALE_CV_WARN_PCT = 25
 
+// --- Bilateral asymmetry (Phase 2) ---
+/** Flag a ratio-scale asymmetry index (|AI%|) above this as notable —
+ *  a visual cue, not a validated clinical cutoff. */
+export const ASYMMETRY_WARN_RATIO_PCT = 15
+/** Flag a points-scale asymmetry (raw R−L difference, e.g. decrement %,
+ *  hesitation count) above this as notable. */
+export const ASYMMETRY_WARN_POINTS = 10
+
 // --- Hand tracking ---
 /**
  * Whether to swap MediaPipe's Left/Right handedness label to get the user's

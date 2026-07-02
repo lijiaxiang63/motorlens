@@ -20,6 +20,7 @@ import { Button } from '../components/ui/button'
 import { Card, CardDescription, CardFooter, CardTitle } from '../components/ui/card'
 import { CheckboxRow } from '../components/ui/field'
 import { ConfirmDialog } from '../components/ui/alert-dialog'
+import { AsymmetryCard } from '../components/AsymmetryCard'
 import { PageHeader } from '../components/PageHeader'
 import { SubjectForm } from '../components/SubjectForm'
 import { fmt } from '../format'
@@ -246,6 +247,8 @@ export function SubjectScreen({ subjectId, notice }: { subjectId: string; notice
           }}
         />
       </Card>
+
+      <AsymmetryCard results={results} subject={s} />
 
       <h3 className="mb-2 mt-5 text-sm font-semibold uppercase tracking-[0.8px] text-muted-foreground">
         Results{results.length > 0 ? ` (${results.length})` : ''}
