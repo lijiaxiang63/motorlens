@@ -6,6 +6,7 @@ import type { MetricKey } from './metricCatalog'
 import {
   METRIC_CATALOG,
   cycleMetricsOf,
+  deltaTone,
   formatDelta,
   formatMetric,
   metricByKey,
@@ -83,5 +84,28 @@ describe('metricCatalog', () => {
     expect(formatDelta(freq, -0.21)).toBe('−0.21 Hz')
     expect(formatDelta(freq, 0)).toBe('±0.00 Hz')
     expect(formatDelta(freq, NaN)).toBe('—')
+  })
+
+  it('never prints a confusing "−0.00" for floating-point noise that rounds to zero', () => {
+    const freq = metricByKey('frequencyHz') // 2 digits
+    expect(formatDelta(freq, -1e-13)).toBe('±0.00 Hz')
+    expect(formatDelta(freq, 1e-13)).toBe('±0.00 Hz')
+    // still signs a delta that's genuinely nonzero at the display precision
+    expect(formatDelta(freq, -0.01)).toBe('−0.01 Hz')
+  })
+
+  it('deltaTone accounts for direction and treats zero/null/neutral specially', () => {
+    const freq = metricByKey('frequencyHz') // higher-better
+    const decrement = metricByKey('ampDecrementPct') // lower-better
+    const itiMean = metricByKey('itiMeanMs') // neutral
+    expect(deltaTone(freq, 0.2)).toBe('good')
+    expect(deltaTone(freq, -0.2)).toBe('bad')
+    expect(deltaTone(decrement, 5)).toBe('bad')
+    expect(deltaTone(decrement, -5)).toBe('good')
+    expect(deltaTone(freq, 0)).toBe('neutral')
+    expect(deltaTone(freq, -1e-13)).toBe('neutral')
+    expect(deltaTone(itiMean, -10)).toBe('neutral')
+    expect(deltaTone(freq, null)).toBeNull()
+    expect(deltaTone(freq, NaN)).toBeNull()
   })
 })

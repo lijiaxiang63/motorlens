@@ -4,6 +4,7 @@
 // when the resolved theme changes so they re-read the chart tokens.
 
 import { useEffect, useImperativeHandle, useRef, type Ref } from 'react'
+import type { TrendLine, TrendPoint } from '../../analysis/trends'
 import type { CycleEvent, Series } from '../../types'
 import { cn } from '../lib/cn'
 import { useTheme } from '../theme'
@@ -11,8 +12,11 @@ import {
   createEventChart,
   createSignalChart,
   createStreamChart,
+  createTrendChart,
   type StreamChartCore,
 } from './uplotCore'
+
+const MS_PER_DAY = 86_400_000
 
 const panelClass = 'rounded-xl border bg-surface px-2 pb-1 pt-3 min-h-[120px]'
 
@@ -94,5 +98,37 @@ export function EventChart({
     const c = createEventChart(host.current!, values, yLabel, { trend, height })
     return () => c.destroy()
   }, [resolved, values, yLabel, trend, height])
+  return <div ref={host} className={cn(panelClass, className)} />
+}
+
+/** Longitudinal trend chart. `points`/`line` are in the days-relative units
+ *  buildTrend() returns (tDays since the first point); this wrapper converts
+ *  to the epoch-seconds x domain createTrendChart expects. */
+export function TrendChart({
+  points,
+  line,
+  yLabel,
+  height,
+  className,
+}: {
+  points: TrendPoint[]
+  line: TrendLine | null
+  yLabel: string
+  height?: number
+  className?: string
+}) {
+  const host = useRef<HTMLDivElement>(null)
+  const { resolved } = useTheme()
+  useEffect(() => {
+    const t0Sec = points.length > 0 ? Date.parse(points[0]!.startedAt) / 1000 : 0
+    const chartPoints = points.map((p) => ({
+      x: t0Sec + (p.tDays * MS_PER_DAY) / 1000,
+      y: p.value,
+    }))
+    const slopePerSec = line ? line.slopePerDay / (MS_PER_DAY / 1000) : 0
+    const chartLine = line ? { m: slopePerSec, b: line.intercept - slopePerSec * t0Sec } : null
+    const c = createTrendChart(host.current!, chartPoints, chartLine, yLabel, { height })
+    return () => c.destroy()
+  }, [resolved, points, line, yLabel, height])
   return <div ref={host} className={cn(panelClass, className)} />
 }

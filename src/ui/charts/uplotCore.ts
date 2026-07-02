@@ -231,3 +231,44 @@ export function createEventChart(
     },
   }
 }
+
+/** Longitudinal trend: a time-scaled scatter of one metric's values across
+ *  sessions, with an optional Theil–Sen line. `points.x` is epoch seconds
+ *  (uPlot's time-scale convention); `line` is already in that same x domain
+ *  (y = m·x + b) — callers convert from the days-relative Trend.line before
+ *  calling this, keeping this module unit-agnostic like createEventChart. */
+export function createTrendChart(
+  el: HTMLElement,
+  points: { x: number; y: number | null }[],
+  line: { m: number; b: number } | null,
+  yLabel: string,
+  opts: { height?: number; palette?: ChartPalette } = {},
+): StaticChartCore {
+  const c = opts.palette ?? readChartPalette()
+  const height = opts.height ?? 220
+  const xs = points.map((p) => p.x)
+  const ys = points.map((p) => p.y)
+  const mount = makeMount(el)
+  const o = baseOpts(c, mount.clientWidth || 600, height)
+  o.scales!.x = { time: true }
+  o.axes = [axis(c), axis(c, yLabel)]
+  o.series.push({
+    stroke: c.marker,
+    paths: () => null,
+    points: { show: true, size: 7, fill: c.marker },
+  })
+  const data: uPlot.AlignedData = [xs, ys as never]
+  if (line && xs.length > 0) {
+    o.series.push({ stroke: c.trend, width: 2, points: { show: false } })
+    ;(data as unknown as number[][]).push(xs.map((x) => line.m * x + line.b))
+  }
+  const u = new uPlot(o, data, mount)
+  const unobserve = observeSize(el, mount, u, height)
+  return {
+    destroy() {
+      unobserve()
+      u.destroy()
+      mount.remove()
+    },
+  }
+}

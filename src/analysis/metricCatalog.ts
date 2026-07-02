@@ -184,9 +184,30 @@ export function formatMetric(def: MetricDef, v: number | null): string {
   return fmt(v, def.digits, def.unit)
 }
 
+/** True when `delta` rounds to zero at `digits` decimal places — tiny
+ *  floating-point noise (e.g. from timestamp jitter between two otherwise
+ *  identical recordings) would otherwise print as a confusing "−0.00". */
+export function roundsToZero(delta: number, digits: number): boolean {
+  return Number(Math.abs(delta).toFixed(digits)) === 0
+}
+
 /** Signed delta with an explicit +/− sign (fmt() only signs negatives). */
 export function formatDelta(def: MetricDef, delta: number | null): string {
   if (delta == null || !Number.isFinite(delta)) return '—'
-  const sign = delta > 0 ? '+' : delta < 0 ? '−' : '±'
+  const zero = roundsToZero(delta, def.digits)
+  const sign = zero ? '±' : delta > 0 ? '+' : '−'
   return sign + Math.abs(delta).toFixed(def.digits) + def.unit
+}
+
+/** Whether a delta reads as improvement, decline, or neither — accounts for
+ *  the metric's direction (a "lower is better" metric going down is good).
+ *  Null delta (no prior to compare to) yields null, not a chip. */
+export function deltaTone(
+  def: MetricDef,
+  delta: number | null,
+): 'good' | 'bad' | 'neutral' | null {
+  if (delta == null || !Number.isFinite(delta)) return null
+  if (def.direction === 'neutral' || roundsToZero(delta, def.digits)) return 'neutral'
+  const improved = def.direction === 'higher-better' ? delta > 0 : delta < 0
+  return improved ? 'good' : 'bad'
 }

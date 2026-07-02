@@ -11,6 +11,7 @@ import { MonitorScreen } from './screens/MonitorScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
 import { SubjectScreen } from './screens/SubjectScreen'
 import { SubjectsScreen } from './screens/SubjectsScreen'
+import { TrendScreen } from './screens/TrendScreen'
 import { VideoReviewScreen } from './screens/VideoReviewScreen'
 import type { FrameSource } from '../types'
 import { NavProvider, useNav, type ScreenRequest } from './nav'
@@ -35,6 +36,15 @@ function ScreenView({ req }: { req: ScreenRequest }) {
       return <MonitorScreen />
     case 'settings':
       return <SettingsScreen />
+    case 'trend':
+      return (
+        <TrendScreen
+          subjectId={req.subjectId}
+          testId={req.testId}
+          metricKey={req.metricKey}
+          hand={req.hand}
+        />
+      )
   }
 }
 

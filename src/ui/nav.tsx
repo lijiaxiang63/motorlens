@@ -16,9 +16,10 @@ import {
   useState,
   type ReactNode,
 } from 'react'
+import type { MetricKey } from '../analysis/metricCatalog'
 import type { TestDefinition } from '../protocol/definitions'
 import type { Subject } from '../store/subjects'
-import type { CycleAnalysis, FrameSource, Hand, LandmarkFrame, ReportSource } from '../types'
+import type { CycleAnalysis, FrameSource, Hand, LandmarkFrame, ReportSource, TestId } from '../types'
 
 /** Threaded through record → results when a test runs for a registered
  *  subject; its absence keeps the original quick-test flow untouched. */
@@ -52,6 +53,7 @@ export type ScreenRequest =
   | { name: 'videoReview'; subject: Subject; file: File }
   | { name: 'monitor' }
   | { name: 'settings' }
+  | { name: 'trend'; subjectId: string; testId: TestId; metricKey: MetricKey; hand?: Hand }
 
 /** Legacy screen-factory contract (kept while vanilla screens are wrapped). */
 export interface ScreenInstance {

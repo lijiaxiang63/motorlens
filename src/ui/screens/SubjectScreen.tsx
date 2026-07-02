@@ -23,6 +23,7 @@ import { ConfirmDialog } from '../components/ui/alert-dialog'
 import { AsymmetryCard } from '../components/AsymmetryCard'
 import { PageHeader } from '../components/PageHeader'
 import { SubjectForm } from '../components/SubjectForm'
+import { TrendGrid } from '../components/TrendGrid'
 import { fmt } from '../format'
 import { useNav } from '../nav'
 import { viewStoredResult } from '../viewResult'
@@ -249,6 +250,7 @@ export function SubjectScreen({ subjectId, notice }: { subjectId: string; notice
       </Card>
 
       <AsymmetryCard results={results} subject={s} />
+      <TrendGrid results={results} subjectId={s.id} />
 
       <h3 className="mb-2 mt-5 text-sm font-semibold uppercase tracking-[0.8px] text-muted-foreground">
         Results{results.length > 0 ? ` (${results.length})` : ''}

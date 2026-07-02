@@ -5,7 +5,14 @@
 // near a zero denominator).
 
 import type { CycleTestMetrics } from '../types'
-import { METRIC_CATALOG, cycleMetricsOf, type MetricDef, type MetricDirection, type MetricKey } from './metricCatalog'
+import {
+  METRIC_CATALOG,
+  cycleMetricsOf,
+  roundsToZero,
+  type MetricDef,
+  type MetricDirection,
+  type MetricKey,
+} from './metricCatalog'
 import type { HandPair } from './pairing'
 
 export interface AsymmetryRow {
@@ -62,7 +69,9 @@ export function asymmetryForPair(pair: HandPair): AsymmetryRow[] {
  *  points), rather than a fixed decimal count that wouldn't fit every metric. */
 export function formatAsymmetryValue(def: MetricDef, row: AsymmetryRow): string {
   if (row.value === null || !Number.isFinite(row.value)) return '—'
-  const sign = row.value > 0 ? '+' : row.value < 0 ? '−' : '±'
+  const digits = row.kind === 'ratio' ? 0 : def.digits
+  const zero = roundsToZero(row.value, digits)
+  const sign = zero ? '±' : row.value > 0 ? '+' : '−'
   const abs = Math.abs(row.value)
-  return row.kind === 'ratio' ? `${sign}${abs.toFixed(0)}%` : `${sign}${abs.toFixed(def.digits)} pts`
+  return row.kind === 'ratio' ? `${sign}${abs.toFixed(0)}%` : `${sign}${abs.toFixed(digits)} pts`
 }

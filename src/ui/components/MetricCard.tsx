@@ -42,12 +42,27 @@ function useCountUp(target: string, enabled: boolean): string {
   return display
 }
 
+export interface MetricDelta {
+  text: string
+  /** good/bad already accounts for the metric's direction (a "lower is
+   *  better" metric going down is 'good'); 'neutral' for direction-agnostic
+   *  metrics or a zero delta. */
+  tone: 'good' | 'bad' | 'neutral'
+}
+
+const deltaToneClass: Record<MetricDelta['tone'], string> = {
+  good: 'bg-ok-surface text-ok',
+  bad: 'bg-danger-surface text-danger',
+  neutral: 'bg-surface-2 text-muted-foreground',
+}
+
 export function MetricCard({
   label,
   value,
   sub,
   tone,
   animate = true,
+  delta,
 }: {
   label: string
   value: string
@@ -56,6 +71,8 @@ export function MetricCard({
   /** Count up from 0 on mount (results screen only — set false for any
    * live-updating usage, e.g. a streaming stat tile). */
   animate?: boolean
+  /** "vs previous session" chip — omit when there's no prior to compare to. */
+  delta?: MetricDelta | undefined
 }) {
   const displayValue = useCountUp(value, animate)
 
@@ -67,7 +84,20 @@ export function MetricCard({
         tone === 'warn' && 'border-warn/50',
       )}
     >
-      <div className="text-xs uppercase tracking-[0.6px] text-muted-foreground">{label}</div>
+      <div className="flex items-center justify-between gap-1.5">
+        <div className="text-xs uppercase tracking-[0.6px] text-muted-foreground">{label}</div>
+        {delta && (
+          <span
+            data-testid="delta-chip"
+            className={cn(
+              'whitespace-nowrap rounded-full px-1.5 py-0.5 text-[10.5px] font-medium tabular-nums',
+              deltaToneClass[delta.tone],
+            )}
+          >
+            {delta.text}
+          </span>
+        )}
+      </div>
       <div
         className={cn(
           'mt-0.5 text-[26px] font-bold tabular-nums',

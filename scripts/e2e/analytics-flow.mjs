@@ -78,6 +78,11 @@ try {
   await page.waitFor('!!window.__lastReport', { timeout: 120_000, interval: 250 })
   await page.waitFor(`document.body.textContent.includes('Saved to ${code}')`, { timeout: 15_000 })
 
+  const deltaChipCount = await page.eval(
+    `document.querySelectorAll('[data-testid="delta-chip"]').length`,
+  )
+  if (deltaChipCount === 0) fail('no delta chip found on the results screen after a second same-test run')
+
   // --- seed a left-hand result by cloning the stored right-hand row in IDB ---
   const seeded = await page.eval(`new Promise((resolve, reject) => {
     const req = indexedDB.open('motorlens')
@@ -118,8 +123,23 @@ try {
   if (!asymmetry) fail('asymmetry card not found after seeding both hands')
   else if (asymmetry.includes('Unpaired')) fail('asymmetry card still shows Unpaired after seeding both hands')
 
+  // --- trend grid: a sparkline cell for the two right-hand runs, click through ---
+  const trendCellCount = await page.eval(`document.querySelectorAll('[data-testid="trend-cell"]').length`)
+  if (trendCellCount === 0) fail('no trend-cell found on the subject hub')
+  else {
+    await page.eval(`document.querySelector('[data-testid="trend-cell"]').click()`)
+    await page.waitFor(`!!document.querySelector('select')`, { timeout: 10_000 })
+    const sessionRows = await page.eval(
+      `document.querySelectorAll('.divide-y.divide-border > button').length`,
+    )
+    if (sessionRows < 2) fail(`trend session table has ${sessionRows} rows, expected >= 2`)
+    await page.eval(`document.querySelector('.divide-y.divide-border > button').click()`)
+    await page.waitFor(`document.body.textContent.includes('Export JSON')`, { timeout: 10_000 })
+  }
+
   console.log(
-    `analytics-flow OK: subject=${code} __lastReport keys unchanged, asymmetry card paired`,
+    `analytics-flow OK: subject=${code} __lastReport keys unchanged, asymmetry card paired, ` +
+      `trend click-through works`,
   )
 } catch (err) {
   fail(err.message)

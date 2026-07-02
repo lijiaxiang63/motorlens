@@ -182,5 +182,11 @@ describe('formatAsymmetryValue', () => {
         key: 'frequencyHz', label: '', left: null, right: null, kind: 'ratio', direction: 'higher-better', value: null,
       }),
     ).toBe('—')
+    // floating-point noise that rounds to zero reads as ± not a confusing "−0%"
+    expect(
+      formatAsymmetryValue(freq, {
+        key: 'frequencyHz', label: '', left: 2, right: 2, kind: 'ratio', direction: 'higher-better', value: -1e-13,
+      }),
+    ).toBe('±0%')
   })
 })

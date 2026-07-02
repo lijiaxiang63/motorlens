@@ -4,17 +4,20 @@
 // `savedRef` guard survives StrictMode's double-invoked effects.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { deltaTone, formatDelta, metricByKey, type MetricKey } from '../../analysis/metricCatalog'
+import { deltasVsPrevious } from '../../analysis/trends'
 import { HAND_SCALE_CV_WARN_PCT } from '../../config'
 import { buildSessionReport, downloadReport } from '../../report/export'
 import {
   getSaveVideoSetting,
+  listResults,
   newId,
   saveResult,
   saveVideo,
   subjectToReportSubject,
 } from '../../store/subjects'
 import { SignalChart, EventChart } from '../charts/charts'
-import { MetricCard } from '../components/MetricCard'
+import { MetricCard, type MetricDelta } from '../components/MetricCard'
 import { PageHeader } from '../components/PageHeader'
 import { StatusChip } from '../components/StatusChip'
 import { Button } from '../components/ui/button'
@@ -92,6 +95,39 @@ export function ResultsScreen({ result: r }: { result: ResultProps }) {
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // --- "vs previous session" delta chips (read-only; safe under StrictMode's
+  // double-invoked effects, unlike the auto-save effect above) ---
+  const [deltas, setDeltas] = useState<Partial<Record<MetricKey, number | null>> | null>(null)
+  useEffect(() => {
+    if (!r.subject) return
+    const subjectId = r.subject.id
+    let alive = true
+    void listResults(subjectId).then((all) => {
+      if (!alive) return
+      const priors = all.filter(
+        (x) =>
+          x.testId === def.id &&
+          x.hand === hand &&
+          x.startedAt < r.startedAt &&
+          x.id !== r.savedResultId,
+      )
+      setDeltas(deltasVsPrevious(m, priors))
+    })
+    return () => {
+      alive = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- r/def/hand/m are fixed for this screen's lifetime (remounts on navigate)
+  }, [])
+
+  function chipFor(key: MetricKey): MetricDelta | undefined {
+    const delta = deltas?.[key]
+    if (delta == null) return undefined
+    const chipDef = metricByKey(key)
+    const tone = deltaTone(chipDef, delta)
+    if (!tone) return undefined
+    return { text: formatDelta(chipDef, delta), tone }
+  }
 
   // --- quality warnings ---
   const warnings: string[] = []
@@ -223,24 +259,42 @@ export function ResultsScreen({ result: r }: { result: ResultProps }) {
           value={String(m.count)}
           sub={`in ${(durationMs / 1000).toFixed(durationMs % 1000 === 0 ? 0 : 1)} s`}
           tone="accent"
+          delta={chipFor('count')}
         />
-        <MetricCard label="Frequency" value={fmt(m.frequencyHz, 2, ' Hz')} />
-        <MetricCard label="Amplitude (mean)" value={fmt(m.amplitudeMean, 2)} sub={cmSub(m.amplitudeMean)} />
-        <MetricCard label="Amplitude (max)" value={fmt(m.amplitudeMax, 2)} sub={cmSub(m.amplitudeMax)} />
+        <MetricCard
+          label="Frequency"
+          value={fmt(m.frequencyHz, 2, ' Hz')}
+          delta={chipFor('frequencyHz')}
+        />
+        <MetricCard
+          label="Amplitude (mean)"
+          value={fmt(m.amplitudeMean, 2)}
+          sub={cmSub(m.amplitudeMean)}
+          delta={chipFor('amplitudeMean')}
+        />
+        <MetricCard
+          label="Amplitude (max)"
+          value={fmt(m.amplitudeMax, 2)}
+          sub={cmSub(m.amplitudeMax)}
+          delta={chipFor('amplitudeMax')}
+        />
         <MetricCard
           label={`${def.closingLabel} (mean)`}
           value={fmt(m.closingVelMean, 1, ' u/s')}
           sub={cmVelSub(m.closingVelMean)}
+          delta={chipFor('closingVelMean')}
         />
         <MetricCard
           label={`${def.closingLabel} (peak)`}
           value={fmt(m.closingVelPeak, 1, ' u/s')}
           sub={cmVelSub(m.closingVelPeak)}
+          delta={chipFor('closingVelPeak')}
         />
         <MetricCard
           label={`${def.openingLabel} (mean)`}
           value={fmt(m.openingVelMean, 1, ' u/s')}
           sub={cmVelSub(m.openingVelMean)}
+          delta={chipFor('openingVelMean')}
         />
         <MetricCard
           label="Amplitude decrement"
@@ -251,9 +305,19 @@ export function ResultsScreen({ result: r }: { result: ResultProps }) {
               : undefined
           }
           tone={(m.amplitudeDecrement.regressionPct ?? 0) > 20 ? 'warn' : undefined}
+          delta={chipFor('ampDecrementPct')}
         />
-        <MetricCard label="Velocity decrement" value={fmt(m.velocityDecrement.regressionPct, 0, '%')} />
-        <MetricCard label="Rhythm variability" value={fmt(m.rhythm.itiCvPct, 0, '%')} sub="CV of intervals" />
+        <MetricCard
+          label="Velocity decrement"
+          value={fmt(m.velocityDecrement.regressionPct, 0, '%')}
+          delta={chipFor('velDecrementPct')}
+        />
+        <MetricCard
+          label="Rhythm variability"
+          value={fmt(m.rhythm.itiCvPct, 0, '%')}
+          sub="CV of intervals"
+          delta={chipFor('itiCvPct')}
+        />
         <MetricCard
           label="Hesitations"
           value={String(m.rhythm.hesitationCount)}
@@ -263,8 +327,13 @@ export function ResultsScreen({ result: r }: { result: ResultProps }) {
               : undefined
           }
           tone={m.rhythm.hesitationCount > 0 ? 'warn' : undefined}
+          delta={chipFor('hesitationCount')}
         />
-        <MetricCard label="Mean interval" value={fmt(m.rhythm.itiMeanMs, 0, ' ms')} />
+        <MetricCard
+          label="Mean interval"
+          value={fmt(m.rhythm.itiMeanMs, 0, ' ms')}
+          delta={chipFor('itiMeanMs')}
+        />
       </div>
 
       <SectionTitle>Signal</SectionTitle>
