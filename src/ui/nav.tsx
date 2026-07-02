@@ -42,6 +42,8 @@ export interface ResultProps {
   videoCaptureFailed?: boolean
   /** Set when viewing an already-stored result — suppresses re-saving. */
   savedResultId?: string
+  /** Seeds the notes editor when reopening a stored/imported result. */
+  notes?: string
 }
 
 export type ScreenRequest =

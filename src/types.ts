@@ -188,4 +188,10 @@ export interface SessionReport {
   raw: { frames: LandmarkFrame[] }
   subject?: ReportSubject
   source?: ReportSource
+  /** Free-text clinician/operator note. Optional and additive, same contract
+   *  as `subject`/`source` — parseSessionJson ignores unknown fields, so
+   *  schemaVersion stays 1 and pre-notes reports round-trip unchanged. Lives
+   *  on the report (not StoredResult) so batch export and backup import
+   *  carry it for free. */
+  notes?: string
 }

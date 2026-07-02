@@ -28,6 +28,7 @@ export function viewStoredResult(
       durationMs: r.report.durationMs,
       subject,
       ...(r.report.source ? { source: r.report.source } : {}),
+      ...(r.report.notes ? { notes: r.report.notes } : {}),
       savedResultId: r.id,
     },
   })

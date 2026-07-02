@@ -22,6 +22,7 @@ export async function importSessionFile(ctx: AppContext, file: File): Promise<st
           analysis: def.compute(report.raw.frames),
           frames: report.raw.frames,
           startedAt: report.startedAt,
+          ...(report.notes ? { notes: report.notes } : {}),
         },
       })
       return null

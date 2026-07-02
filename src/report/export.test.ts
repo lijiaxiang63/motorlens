@@ -6,7 +6,7 @@ import { buildSessionReport, parseSessionJson, reportFileName } from './export'
 
 const startedAt = '2026-07-02T10:15:02.000Z'
 
-function buildBase(extra?: { subject?: ReportSubject; source?: ReportSource }) {
+function buildBase(extra?: { subject?: ReportSubject; source?: ReportSource; notes?: string }) {
   const { frames } = makeTapFrames({ freqHz: 2, durationMs: 4000 })
   return buildSessionReport({
     test: 'finger_tap',
@@ -65,5 +65,16 @@ describe('session report round-trip', () => {
   it('derives a stable filename from test, hand, and start time', () => {
     const report = buildBase()
     expect(reportFileName(report)).toMatch(/^motorlens_finger_tap_right_\d{8}-\d{6}\.json$/)
+  })
+
+  it('keeps reports without notes free of the key (byte-identity preserved)', () => {
+    const report = buildBase()
+    expect('notes' in report).toBe(false)
+  })
+
+  it('preserves notes through JSON export → parse', () => {
+    const report = buildBase({ notes: 'Patient reported fatigue after set 3.' })
+    const parsed = parseSessionJson(JSON.stringify(report))
+    expect(parsed.notes).toBe('Patient reported fatigue after set 3.')
   })
 })

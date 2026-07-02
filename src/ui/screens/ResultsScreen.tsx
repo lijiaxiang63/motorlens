@@ -9,6 +9,7 @@ import { deltasVsPrevious } from '../../analysis/trends'
 import { HAND_SCALE_CV_WARN_PCT } from '../../config'
 import { buildSessionReport, downloadReport } from '../../report/export'
 import {
+  getResult,
   getSaveVideoSetting,
   listResults,
   newId,
@@ -21,6 +22,8 @@ import { MetricCard, type MetricDelta } from '../components/MetricCard'
 import { PageHeader } from '../components/PageHeader'
 import { StatusChip } from '../components/StatusChip'
 import { Button } from '../components/ui/button'
+import { Card, CardDescription, CardTitle } from '../components/ui/card'
+import { Textarea } from '../components/ui/field'
 import { fmt } from '../format'
 import { useNav, type ResultProps } from '../nav'
 
@@ -54,16 +57,24 @@ export function ResultsScreen({ result: r }: { result: ResultProps }) {
   // --- subject-mode auto-save (exactly once; viewing saved results skips) ---
   const savedRef = useRef(false)
   const [savedChip, setSavedChip] = useState<{ state: 'ok' | 'err'; text: string } | null>(null)
+  // The stored result's id — retained (not just minted-and-discarded) so the
+  // notes editor below has something to persist against. Seeded from
+  // savedResultId when reopening an already-stored result.
+  const [resultId, setResultId] = useState<string | null>(r.savedResultId ?? null)
+  const resultIdRef = useRef(resultId)
+  useEffect(() => {
+    resultIdRef.current = resultId
+  }, [resultId])
   useEffect(() => {
     if (!r.subject || r.savedResultId || savedRef.current) return
     savedRef.current = true
     const subject = r.subject
-    const resultId = newId()
+    const newResultId = newId()
     void (async () => {
       let videoKey: string | undefined
       if (r.capturedVideo) {
         try {
-          videoKey = `live_${resultId}`
+          videoKey = `live_${newResultId}`
           await saveVideo({
             key: videoKey,
             blob: r.capturedVideo.blob,
@@ -74,7 +85,7 @@ export function ResultsScreen({ result: r }: { result: ResultProps }) {
         }
       }
       await saveResult({
-        id: resultId,
+        id: newResultId,
         subjectId: subject.id,
         testId: def.id,
         hand,
@@ -83,6 +94,7 @@ export function ResultsScreen({ result: r }: { result: ResultProps }) {
         ...(videoKey ? { videoKey } : {}),
         report,
       })
+      setResultId(newResultId)
       setSavedChip({
         state: 'ok',
         text: `Saved to ${subject.code}${videoKey ? ' · video kept' : ''}`,
@@ -93,6 +105,44 @@ export function ResultsScreen({ result: r }: { result: ResultProps }) {
         text: `Not saved: ${err instanceof Error ? err.message : String(err)}`,
       })
     })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // --- notes editor — debounced persistence via get→mutate report.notes→
+  // saveResult; idempotent (idbPut upserts), so no StrictMode ref guard is
+  // needed. `resultIdRef`/`notesRef` hold the latest values so the mount-time
+  // unmount-cleanup closure below never reads stale data. ---
+  const [notes, setNotesState] = useState(r.notes ?? '')
+  const notesRef = useRef(notes)
+  const notesTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  async function persistNotes(text: string) {
+    const id = resultIdRef.current
+    if (!id) return // quick test (no subject) — nothing to persist against yet
+    const row = await getResult(id)
+    if (!row) return
+    if (text) row.report.notes = text
+    else delete row.report.notes
+    await saveResult(row)
+  }
+
+  function flushNotes() {
+    if (notesTimerRef.current) {
+      clearTimeout(notesTimerRef.current)
+      notesTimerRef.current = null
+    }
+    void persistNotes(notesRef.current)
+  }
+
+  function handleNotesChange(text: string) {
+    notesRef.current = text
+    setNotesState(text)
+    if (notesTimerRef.current) clearTimeout(notesTimerRef.current)
+    notesTimerRef.current = setTimeout(() => void persistNotes(text), 600)
+  }
+
+  useEffect(() => {
+    return () => flushNotes()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -212,7 +262,10 @@ export function ResultsScreen({ result: r }: { result: ResultProps }) {
         }
         actions={
           <>
-            <Button variant="ghost" onClick={() => void downloadReport(report)}>
+            <Button
+              variant="ghost"
+              onClick={() => void downloadReport(notes ? { ...report, notes } : report)}
+            >
               Export JSON
             </Button>
             <Button variant="ghost" onClick={() => window.print()}>
@@ -349,6 +402,21 @@ export function ResultsScreen({ result: r }: { result: ResultProps }) {
           <EventChart values={itis} yLabel="interval (ms)" />
         </div>
       </div>
+
+      <Card className="mt-5">
+        <CardTitle>Notes</CardTitle>
+        <Textarea
+          className="mt-2"
+          rows={3}
+          value={notes}
+          onChange={(e) => handleNotesChange(e.target.value)}
+          onBlur={flushNotes}
+          placeholder="Optional note for this session…"
+        />
+        <CardDescription>
+          {resultId ? 'Saved with this result.' : 'Included in the exported JSON for this session.'}
+        </CardDescription>
+      </Card>
     </div>
   )
 }

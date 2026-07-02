@@ -38,6 +38,7 @@ export function buildSessionReport(args: {
   frames: LandmarkFrame[]
   subject?: ReportSubject
   source?: ReportSource
+  notes?: string
 }): SessionReport {
   const { analysis } = args
   return {
@@ -52,9 +53,10 @@ export function buildSessionReport(args: {
     series: analysis?.signal ?? { t: [], v: [] },
     events: analysis?.events ?? [],
     raw: { frames: compactFrames(args.frames) },
-    // Spread-only-when-present keeps pre-subject report JSON byte-identical.
+    // Spread-only-when-present keeps pre-subject/source/notes report JSON byte-identical.
     ...(args.subject ? { subject: args.subject } : {}),
     ...(args.source ? { source: args.source } : {}),
+    ...(args.notes ? { notes: args.notes } : {}),
   }
 }
 

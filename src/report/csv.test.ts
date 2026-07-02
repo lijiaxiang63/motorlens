@@ -17,7 +17,7 @@ const subject: Subject = {
   createdAt: '2026-07-02T09:00:00.000Z',
 }
 
-function makeResult(withVideo: boolean): StoredResult {
+function makeResult(withVideo: boolean, notes?: string): StoredResult {
   const { frames } = makeTapFrames({ freqHz: 2, durationMs: 4000 })
   const report = buildSessionReport({
     test: 'finger_tap',
@@ -26,6 +26,7 @@ function makeResult(withVideo: boolean): StoredResult {
     durationMs: 4000,
     analysis: computeTapMetrics(frames),
     frames,
+    ...(notes ? { notes } : {}),
   })
   return {
     id: 'r1',
@@ -79,5 +80,61 @@ describe('summary CSV', () => {
     expect(csv).toContain('"García, ""Maria"""')
     expect(csv).toContain('"PD, H&Y 2"')
     expect(csv).toContain('"line1\nline2"')
+  })
+
+  it('locks the 39-column set with result_notes appended last', () => {
+    expect(SUMMARY_COLUMNS.length).toBe(39)
+    expect(SUMMARY_COLUMNS[38]).toBe('result_notes')
+    // Original 38-column order is unchanged.
+    expect(SUMMARY_COLUMNS.slice(0, 38)).toEqual([
+      'subject_code',
+      'subject_name',
+      'sex',
+      'birth_year',
+      'dominant_hand',
+      'diagnosis',
+      'notes',
+      'test',
+      'hand',
+      'source',
+      'started_at',
+      'duration_ms',
+      'count',
+      'frequency_hz',
+      'amplitude_mean',
+      'amplitude_max',
+      'amplitude_mean_cm',
+      'closing_vel_mean',
+      'closing_vel_peak',
+      'closing_vel_peak_cm_s',
+      'opening_vel_mean',
+      'opening_vel_peak',
+      'amp_decrement_regression_pct',
+      'amp_decrement_thirds_pct',
+      'vel_decrement_regression_pct',
+      'vel_decrement_thirds_pct',
+      'iti_mean_ms',
+      'iti_cv_pct',
+      'hesitation_count',
+      'longest_pause_ms',
+      'dropped_intervals',
+      'cm_per_unit',
+      'mean_fps',
+      'detection_rate',
+      'hand_scale_cv_pct',
+      'has_video',
+      'video_file',
+      'report_file',
+    ])
+  })
+
+  it('emits result_notes for the per-result note (distinct from subject notes)', () => {
+    const withNotes = buildSummaryRow(subject, makeResult(false, 'Patient reported fatigue'), '', '')
+    const withoutNotes = buildSummaryRow(subject, makeResult(false), '', '')
+    const get = (row: string[], col: (typeof SUMMARY_COLUMNS)[number]) =>
+      row[SUMMARY_COLUMNS.indexOf(col)]
+    expect(get(withNotes, 'result_notes')).toBe('Patient reported fatigue')
+    expect(get(withNotes, 'notes')).toBe('line1\nline2') // subject notes untouched
+    expect(get(withoutNotes, 'result_notes')).toBe('')
   })
 })

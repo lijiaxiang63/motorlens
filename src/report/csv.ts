@@ -44,6 +44,7 @@ export const SUMMARY_COLUMNS = [
   'has_video',
   'video_file',
   'report_file',
+  'result_notes',
 ] as const
 
 /** '' for null/undefined; numbers rounded to 4 decimals (trailing zeros trimmed
@@ -110,6 +111,7 @@ export function buildSummaryRow(
     result.videoKey ? 'yes' : 'no',
     cell(videoFile),
     cell(reportFile),
+    cell(rep.notes),
   ]
 }
 
