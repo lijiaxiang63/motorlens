@@ -78,7 +78,7 @@
       ],
       "icon": "build/icon.icns",
       "category": "public.app-category.medical",
-      "identity": null,
+      "identity": "-",
       "hardenedRuntime": true,
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",

@@ -45,12 +45,19 @@ app is the same code as the browser build, wrapped in Electron for native
 window chrome, a Dock/taskbar icon, and native save/open dialogs — camera
 processing and storage stay entirely on-device either way.
 
-**Installing an unsigned build** — the app isn't code-signed yet (no Apple
-Developer ID / no EV certificate), so the OS will warn on first launch:
+**Installing an unnotarized build** — the app is ad-hoc signed (`identity:
+"-"` in `package.json`'s `build.mac`) rather than with a paid Apple Developer
+ID / EV certificate, so the OS will warn on first launch:
 
 - **macOS**: Gatekeeper blocks the unidentified developer. Right-click the
   app → *Open* → *Open* (only needed once), or clear the quarantine flag from
-  Terminal: `xattr -dr com.apple.quarantine /Applications/MotorLens.app`.
+  Terminal: `xattr -dr com.apple.quarantine /Applications/MotorLens.app`. (If
+  `identity` were `null` — no signature at all — arm64 macOS refuses to run
+  the binary once quarantined and shows a dead-end "is damaged" dialog
+  instead; ad-hoc signing keeps this in the recoverable path above. See
+  `electron-builder`'s [mac docs](https://www.electron.build/docs/mac/) and
+  `build/entitlements.mac.plist`'s `disable-library-validation` entitlement,
+  required for ad-hoc signing to work with `hardenedRuntime: true`.)
 - **Windows**: SmartScreen shows "Windows protected your PC". Click
   *More info* → *Run anyway*.
 
