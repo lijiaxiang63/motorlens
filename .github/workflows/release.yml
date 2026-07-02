@@ -61,7 +61,60 @@ jobs:
 
       - run: node scripts/build-electron.mjs
 
-      - name: Package and publish (draft release)
-        run: npx electron-builder ${{ matrix.args }} --publish always
+      # --publish never: package only. electron-builder still writes the
+      # latest*.yml update-feed metadata (publish config in package.json is
+      # enough to trigger that), it just doesn't touch GitHub. Publishing
+      # from each matrix leg independently used to race and create two
+      # separate draft releases (one per OS, each with only half the
+      # assets) — the `publish` job below does it once, from everything.
+      - run: npx electron-builder ${{ matrix.args }} --publish never
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ matrix.os }}
+          path: |
+            release/*.dmg
+            release/*.zip
+            release/*.exe
+            release/*.blockmap
+            release/latest*.yml
+          if-no-files-found: error
+          retention-days: 5
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-*
+          path: release
+          merge-multiple: true
+
+      - name: Generate brief release notes from the commit log
+        run: |
+          PREV_TAG=$(git tag --sort=-v:refname | grep -v "^${GITHUB_REF_NAME}$" | head -1)
+          {
+            echo "## What changed"
+            if [ -n "$PREV_TAG" ]; then
+              git log --pretty='format:- %s' "${PREV_TAG}..${GITHUB_REF_NAME}"
+            else
+              git log --pretty='format:- %s' "${GITHUB_REF_NAME}"
+            fi
+            echo
+          } > notes.md
+
+      - name: Create draft release
+        uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          body_path: notes.md
+          generate_release_notes: true
+          files: release/**
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

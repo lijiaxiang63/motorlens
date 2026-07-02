@@ -76,10 +76,13 @@ git push && git push --tags
 ```
 
 Pushing a `v*` tag triggers `.github/workflows/release.yml`: tests run once,
-then macOS and Windows builds run in parallel and upload a **draft** GitHub
-Release (dmg, zip, exe installer, block maps, and the `latest*.yml` update
-feeds electron-updater reads). Sanity-check the draft's assets, then publish
-it — that's the moment auto-update starts offering it to existing installs.
+then macOS and Windows builds run in parallel and each uploads its packaged
+output (dmg, zip, exe installer, block maps, and the `latest*.yml` update
+feeds electron-updater reads) as a workflow artifact. A final `publish` job
+downloads both, generates a brief changelog from the commit log since the
+previous tag, and creates a single **draft** GitHub Release with everything
+attached. Sanity-check the draft's assets, then publish it — that's the
+moment auto-update starts offering it to existing installs.
 
 ## Setup
 
