@@ -6,6 +6,8 @@ import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron'
 import {
   IPC,
   type AppInfo,
+  type ExportPdfRequest,
+  type ExportPdfResult,
   type FileFilter,
   type OpenFileResult,
   type SaveFileRequest,
@@ -34,6 +36,8 @@ const api = {
     ipcRenderer.on(IPC.updateEvent, listener)
     return () => ipcRenderer.removeListener(IPC.updateEvent, listener)
   },
+  exportPdf: (req: ExportPdfRequest): Promise<ExportPdfResult> => ipcRenderer.invoke(IPC.exportPdf, req),
+  reportReady: (): void => ipcRenderer.send(IPC.reportReady),
 }
 
 contextBridge.exposeInMainWorld('motorlens', api)

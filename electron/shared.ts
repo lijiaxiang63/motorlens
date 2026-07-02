@@ -12,6 +12,10 @@ export const IPC = {
   updateOpenRelease: 'motorlens:update-open-release',
   /** Push-only: main -> renderer, whenever `UpdateStatus` changes. */
   updateEvent: 'motorlens:update-event',
+  exportPdf: 'motorlens:export-pdf',
+  /** Send-only: renderer -> main, once the report route has finished
+   *  rendering (incl. any chart images) in whichever window loaded it. */
+  reportReady: 'motorlens:report-ready',
 } as const
 
 export interface FileFilter {
@@ -38,6 +42,23 @@ export interface SaveFileResult {
 export interface OpenFileResult {
   name: string
   data: ArrayBuffer
+}
+
+// --- Clinical PDF export (Phase 3e) -----------------------------------
+// See electron/pdf.ts: a hidden BrowserWindow at the same app://bundle
+// origin loads the report route, the renderer pings `reportReady` once its
+// document (incl. chart images) has rendered, then main calls printToPDF.
+
+export interface ExportPdfRequest {
+  kind: 'session' | 'subject'
+  id: string
+  defaultName: string
+}
+
+export interface ExportPdfResult {
+  saved: boolean
+  path?: string
+  error?: string
 }
 
 // --- Auto-update -----------------------------------------------------

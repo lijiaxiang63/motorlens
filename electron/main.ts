@@ -20,6 +20,7 @@ import {
   session,
   systemPreferences,
 } from 'electron'
+import { registerPdfHandlers } from './pdf'
 import { IPC, type SaveFileRequest } from './shared'
 import { initUpdater } from './updater'
 
@@ -242,6 +243,7 @@ app.whenReady().then(async () => {
   // window.motorlens exists) never races an unregistered handler. The
   // `() => win` getter means it's safe to call before `win` is assigned.
   initUpdater(() => win)
+  registerPdfHandlers(() => win)
 
   // Camera-only permission grants; everything else is denied.
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {
