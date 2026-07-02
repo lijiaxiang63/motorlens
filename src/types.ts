@@ -150,6 +150,29 @@ export type JointSummaries = Record<JointId, JointSummary>
 // ---------------------------------------------------------------------------
 // Session report (export JSON)
 
+/** Subject metadata embedded in exported reports. Optional and additive —
+ *  parseSessionJson ignores unknown fields, so schemaVersion stays 1 and
+ *  pre-subject reports round-trip unchanged. */
+export interface ReportSubject {
+  code: string
+  name?: string
+  sex?: 'male' | 'female' | 'other'
+  birthYear?: number
+  dominantHand?: Hand
+  diagnosis?: string
+  notes?: string
+}
+
+/** How the frames were acquired. Absent = live camera (pre-feature reports). */
+export interface ReportSource {
+  kind: 'live' | 'video'
+  /** Original name of the uploaded file (video only). */
+  fileName?: string
+  /** Segment bounds within the uploaded file, ms of video time (video only). */
+  segmentStartMs?: number
+  segmentEndMs?: number
+}
+
 export interface SessionReport {
   schemaVersion: 1
   app: { name: 'MotorLens'; version: string }
@@ -163,4 +186,6 @@ export interface SessionReport {
   series: Series
   events: CycleEvent[]
   raw: { frames: LandmarkFrame[] }
+  subject?: ReportSubject
+  source?: ReportSource
 }

@@ -1,0 +1,69 @@
+import { describe, expect, it } from 'vitest'
+import { computeTapMetrics } from '../metrics/taps'
+import { makeTapFrames } from '../replay/synthetic'
+import type { ReportSource, ReportSubject } from '../types'
+import { buildSessionReport, parseSessionJson, reportFileName } from './export'
+
+const startedAt = '2026-07-02T10:15:02.000Z'
+
+function buildBase(extra?: { subject?: ReportSubject; source?: ReportSource }) {
+  const { frames } = makeTapFrames({ freqHz: 2, durationMs: 4000 })
+  return buildSessionReport({
+    test: 'finger_tap',
+    hand: 'right',
+    startedAt,
+    durationMs: 4000,
+    analysis: computeTapMetrics(frames),
+    frames,
+    ...(extra ?? {}),
+  })
+}
+
+describe('session report round-trip', () => {
+  it('keeps reports without subject/source byte-identical to the legacy shape', () => {
+    const report = buildBase()
+    expect('subject' in report).toBe(false)
+    expect('source' in report).toBe(false)
+    const keys = Object.keys(report)
+    expect(keys).toEqual([
+      'schemaVersion',
+      'app',
+      'test',
+      'hand',
+      'startedAt',
+      'durationMs',
+      'quality',
+      'metrics',
+      'series',
+      'events',
+      'raw',
+    ])
+  })
+
+  it('preserves subject and source through JSON export → parse', () => {
+    const report = buildBase({
+      subject: { code: 'P001', name: 'Maria', birthYear: 1958, dominantHand: 'right' },
+      source: { kind: 'video', fileName: 'clip.mp4', segmentStartMs: 1200, segmentEndMs: 9800 },
+    })
+    const parsed = parseSessionJson(JSON.stringify(report))
+    expect(parsed.subject).toEqual(report.subject)
+    expect(parsed.source).toEqual(report.source)
+    expect(parsed.raw.frames.length).toBe(report.raw.frames.length)
+  })
+
+  it('recomputes identical metrics from exported raw frames', () => {
+    const report = buildBase()
+    const parsed = parseSessionJson(JSON.stringify(report))
+    const re = computeTapMetrics(parsed.raw.frames)
+    expect(re.metrics.count).toBe((report.metrics as { count: number }).count)
+    expect(re.metrics.frequencyHz).toBeCloseTo(
+      (report.metrics as { frequencyHz: number }).frequencyHz,
+      6,
+    )
+  })
+
+  it('derives a stable filename from test, hand, and start time', () => {
+    const report = buildBase()
+    expect(reportFileName(report)).toMatch(/^motorlens_finger_tap_right_\d{8}-\d{6}\.json$/)
+  })
+})

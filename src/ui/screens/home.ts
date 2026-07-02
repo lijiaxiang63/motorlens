@@ -73,6 +73,26 @@ export function createHomeScreen(ctx: AppContext): ScreenInstance {
       ),
     )
     cards.replaceChildren(
+      h(
+        'div',
+        { class: 'test-card subject-entry' },
+        h('h3', {}, 'Subject session'),
+        h(
+          'p',
+          { class: 'muted' },
+          'Register subjects, run the test battery for each, save videos, and batch-export all results.',
+        ),
+        h(
+          'div',
+          { class: 'card-footer' },
+          h('span', { class: 'muted small' }, 'batch workflow'),
+          h(
+            'button',
+            { class: 'btn primary', onclick: () => ctx.navigate({ name: 'subjects' }) },
+            'Open subjects',
+          ),
+        ),
+      ),
       handToggle,
       ...TEST_DEFS.map((def) =>
         h(

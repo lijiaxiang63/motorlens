@@ -8,6 +8,8 @@ import type {
   Hand,
   JointSummaries,
   LandmarkFrame,
+  ReportSource,
+  ReportSubject,
   SessionReport,
   TestId,
   Vec3,
@@ -33,6 +35,8 @@ export function buildSessionReport(args: {
   analysis: CycleAnalysis | null
   jointSummaries?: JointSummaries
   frames: LandmarkFrame[]
+  subject?: ReportSubject
+  source?: ReportSource
 }): SessionReport {
   const { analysis } = args
   return {
@@ -47,13 +51,21 @@ export function buildSessionReport(args: {
     series: analysis?.signal ?? { t: [], v: [] },
     events: analysis?.events ?? [],
     raw: { frames: compactFrames(args.frames) },
+    // Spread-only-when-present keeps pre-subject report JSON byte-identical.
+    ...(args.subject ? { subject: args.subject } : {}),
+    ...(args.source ? { source: args.source } : {}),
   }
 }
 
-function stamp(iso: string): string {
+export function stamp(iso: string): string {
   const d = new Date(iso)
   const p = (n: number, w = 2) => String(n).padStart(w, '0')
   return `${d.getFullYear()}${p(d.getMonth() + 1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}${p(d.getSeconds())}`
+}
+
+/** Shared by the single-report download and the batch-export ZIP layout. */
+export function reportFileName(report: SessionReport): string {
+  return `motorlens_${report.test}_${report.hand}_${stamp(report.startedAt)}.json`
 }
 
 export function downloadReport(report: SessionReport): void {
@@ -61,7 +73,7 @@ export function downloadReport(report: SessionReport): void {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
-  a.download = `motorlens_${report.test}_${report.hand}_${stamp(report.startedAt)}.json`
+  a.download = reportFileName(report)
   a.click()
   setTimeout(() => URL.revokeObjectURL(url), 5_000)
 }

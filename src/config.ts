@@ -66,4 +66,48 @@ export const LIVE_COUNT_THROTTLE_MS = 250
 export const TAP_LIVE_Y_RANGE: readonly [number, number] = [0, 1.8]
 export const FIST_LIVE_Y_RANGE: readonly [number, number] = [0, 2.6]
 
+// --- Subjects & local storage (IndexedDB) ---
+export const DB_NAME = 'motorlens'
+export const DB_VERSION = 1
+/** Default for the "save camera video" toggle in subject sessions. */
+export const SAVE_VIDEO_DEFAULT = true
+
+// --- Live video capture (MediaRecorder during subject-mode tests) ---
+export const RECORDER_MIME_CANDIDATES = [
+  'video/webm;codecs=vp9',
+  'video/webm;codecs=vp8',
+  'video/webm',
+  'video/mp4', // Safari
+] as const
+export const RECORDER_BITS_PER_SECOND = 2_500_000
+/** Give MediaRecorder.onstop this long to deliver; then save without video. */
+export const RECORDER_STOP_TIMEOUT_MS = 2_000
+
+// --- Uploaded-video processing (offline MediaPipe over a file) ---
+export const VIDEO_PROC_FPS = 30
+/** A single seek taking longer than this fails the whole file (codec issue). */
+export const VIDEO_SEEK_TIMEOUT_MS = 5_000
+/** Warn (and require confirmation) before processing files longer than this. */
+export const VIDEO_WARN_DURATION_S = 300
+
+// --- Auto-segmentation of uploaded videos (see metrics/segments.ts) ---
+/** Handedness majority vote over this many trailing detected frames. */
+export const SEG_VOTE_WINDOW = 15
+/** Detection gap that splits presence runs (larger than in-test dropouts). */
+export const SEG_GAP_SPLIT_MS = 1_000
+export const SEG_MIN_SEGMENT_MS = 3_000
+export const SEG_CLASSIFY_WINDOW_MS = 2_000
+export const SEG_CLASSIFY_HOP_MS = 500
+/** Windows with fewer world-landmark samples than this are 'idle'. */
+export const SEG_MIN_WINDOW_SAMPLES = 12
+/** p90−p10 of normalized middle/ring/pinky→wrist distance ⇒ fist. Checked
+ *  before the tap rule: thumb–index separation oscillates during fists too. */
+export const SEG_FIST_OSC_MIN = 0.45
+/** p90−p10 of normalized thumb–index separation ⇒ tap (when not a fist). */
+export const SEG_TAP_OSC_MIN = 0.25
+/** Same-label segments closer than this merge (pauses become hesitations). */
+export const SEG_MERGE_GAP_MS = 2_500
+/** Flag auto-detected segments below this confidence for manual review. */
+export const SEG_CONFIDENCE_WARN = 0.7
+
 export const APP_VERSION = '0.1.0'

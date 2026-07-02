@@ -69,6 +69,18 @@ export function apertureRaw(world: Vec3[]): number {
   return s / APERTURE_TIPS.length
 }
 
+/** Fingertips that stay extended during tapping (index excluded — it moves). */
+export const REST_TIPS = [12, 16, 20] as const
+
+/** Mean middle/ring/pinky-tip-to-wrist distance, meters (world). Oscillates
+ *  during fist open–close but stays ~constant during finger tapping, which is
+ *  what separates the two movements in uploaded-video classification. */
+export function restRaw(world: Vec3[]): number {
+  let s = 0
+  for (const tip of REST_TIPS) s += dist3D(world[tip]!, world[WRIST]!)
+  return s / REST_TIPS.length
+}
+
 export interface ExtractedSignal {
   /** Normalized signal sampled at detected frames only. */
   series: Series
