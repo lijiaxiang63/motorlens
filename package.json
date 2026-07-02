@@ -1,0 +1,26 @@
+{
+  "name": "motorlens",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Camera-based hand motor function assessment — finger tapping, fist open-close, and joint kinematics from MediaPipe hand tracking.",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit",
+    "assets": "node scripts/fetch-assets.mjs",
+    "postinstall": "node scripts/fetch-assets.mjs"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "^0.10.35",
+    "uplot": "^1.6.32"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vite": "^8.1.2",
+    "vitest": "^4.1.9"
+  }
+}
