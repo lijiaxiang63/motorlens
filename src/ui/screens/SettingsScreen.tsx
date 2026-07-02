@@ -1,16 +1,37 @@
-// Settings (Phase 1 minimal scope): theme, save-video default, About.
-// The full settings surface (reference thresholds, data location…) lands in
-// later phases per the roadmap.
+// Settings: theme, save-video default, reference cues (Phase 3), About.
+// Data-location reveal is the remaining item from the roadmap's full scope.
 
 import { useEffect, useState } from 'react'
+import {
+  DEFAULT_REFERENCE_THRESHOLDS,
+  type MetricThreshold,
+  type ReferenceThresholds,
+} from '../../analysis/thresholds'
+import { METRIC_CATALOG, type MetricKey } from '../../analysis/metricCatalog'
 import { APP_VERSION } from '../../config'
 import { isDesktop, type UpdateStatus } from '../../platform'
-import { getSaveVideoSetting, setSaveVideoSetting } from '../../store/subjects'
+import {
+  getReferenceThresholds,
+  getSaveVideoSetting,
+  setReferenceThresholds,
+  setSaveVideoSetting,
+} from '../../store/subjects'
 import { Button } from '../components/ui/button'
-import { Card, CardDescription, CardTitle } from '../components/ui/card'
-import { CheckboxRow, Field, Select } from '../components/ui/field'
+import { Card, CardDescription, CardFooter, CardTitle } from '../components/ui/card'
+import { CheckboxRow, Field, Input, Select } from '../components/ui/field'
 import { PageHeader } from '../components/PageHeader'
 import { useTheme, type ThemePref } from '../theme'
+
+type BoundKind = 'warnBelow' | 'warnAbove'
+
+function inputsFrom(t: ReferenceThresholds): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const def of METRIC_CATALOG) {
+    out[`${def.key}:warnBelow`] = t[def.key]?.warnBelow?.toString() ?? ''
+    out[`${def.key}:warnAbove`] = t[def.key]?.warnAbove?.toString() ?? ''
+  }
+  return out
+}
 
 /** "Check for updates" row inside the About card — desktop only. Renders
  * nothing until the bridge's update methods exist (older preload / browser
@@ -68,11 +89,18 @@ export function SettingsScreen() {
   const { pref, setPref } = useTheme()
   const [saveVideo, setSaveVideo] = useState<boolean | null>(null)
   const [desktopVersion, setDesktopVersion] = useState<string | null>(null)
+  const [thresholds, setThresholds] = useState<ReferenceThresholds | null>(null)
+  const [inputs, setInputs] = useState<Record<string, string>>({})
 
   useEffect(() => {
     let cancelled = false
     void getSaveVideoSetting().then((v) => {
       if (!cancelled) setSaveVideo(v)
+    })
+    void getReferenceThresholds().then((t) => {
+      if (cancelled) return
+      setThresholds(t)
+      setInputs(inputsFrom(t))
     })
     if (isDesktop()) {
       void window.motorlens
@@ -86,6 +114,32 @@ export function SettingsScreen() {
       cancelled = true
     }
   }, [])
+
+  /** Parses the field's text and commits (persists + normalizes the display
+   *  value); an empty or non-numeric entry clears that bound. */
+  function commitBound(key: MetricKey, kind: BoundKind, text: string) {
+    const trimmed = text.trim()
+    const parsed = trimmed === '' ? undefined : Number(trimmed)
+    const value = parsed !== undefined && Number.isFinite(parsed) ? parsed : undefined
+
+    setThresholds((prev) => {
+      const base: ReferenceThresholds = { ...(prev ?? {}) }
+      const entry: MetricThreshold = { ...base[key] }
+      if (value === undefined) delete entry[kind]
+      else entry[kind] = value
+      if (entry.warnBelow === undefined && entry.warnAbove === undefined) delete base[key]
+      else base[key] = entry
+      void setReferenceThresholds(base).catch(() => {})
+      return base
+    })
+    setInputs((prev) => ({ ...prev, [`${key}:${kind}`]: value !== undefined ? String(value) : '' }))
+  }
+
+  function resetThresholdsToDefaults() {
+    setThresholds(DEFAULT_REFERENCE_THRESHOLDS)
+    setInputs(inputsFrom(DEFAULT_REFERENCE_THRESHOLDS))
+    void setReferenceThresholds(DEFAULT_REFERENCE_THRESHOLDS).catch(() => {})
+  }
 
   return (
     <div className="mx-auto max-w-[720px] px-6 pb-12 pt-6">
@@ -117,6 +171,61 @@ export function SettingsScreen() {
               Save camera video with each subject test (default for new sessions)
             </CheckboxRow>
           )}
+        </Card>
+
+        <Card>
+          <CardTitle>Reference cues</CardTitle>
+          <CardDescription>
+            Flags a metric on results screens and clinical PDF reports when it crosses a
+            threshold you set here. These are user-configurable reference cues, not validated
+            clinical norms.
+          </CardDescription>
+          {thresholds !== null && (
+            <div className="mt-3 flex flex-col gap-1.5">
+              <div className="grid grid-cols-[1fr_92px_92px] gap-2 px-1 text-[11px] font-medium uppercase tracking-[0.5px] text-muted-foreground">
+                <span>Metric</span>
+                <span>Warn below</span>
+                <span>Warn above</span>
+              </div>
+              {METRIC_CATALOG.map((def) => (
+                <div key={def.key} className="grid grid-cols-[1fr_92px_92px] items-center gap-2">
+                  <span className="text-[13px] text-foreground">
+                    {def.label}
+                    {def.unit ? ` (${def.unit.trim()})` : ''}
+                  </span>
+                  <Input
+                    type="number"
+                    step="any"
+                    aria-label={`${def.label} warn below`}
+                    value={inputs[`${def.key}:warnBelow`] ?? ''}
+                    onChange={(e) =>
+                      setInputs((prev) => ({ ...prev, [`${def.key}:warnBelow`]: e.target.value }))
+                    }
+                    onBlur={(e) => commitBound(def.key, 'warnBelow', e.target.value)}
+                  />
+                  <Input
+                    type="number"
+                    step="any"
+                    aria-label={`${def.label} warn above`}
+                    value={inputs[`${def.key}:warnAbove`] ?? ''}
+                    onChange={(e) =>
+                      setInputs((prev) => ({ ...prev, [`${def.key}:warnAbove`]: e.target.value }))
+                    }
+                    onBlur={(e) => commitBound(def.key, 'warnAbove', e.target.value)}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
+          <CardFooter>
+            <span className="text-xs text-muted-foreground">
+              Every report and flagged card carries a disclaimer that these are not diagnostic
+              norms.
+            </span>
+            <Button variant="ghost" size="sm" onClick={resetThresholdsToDefaults}>
+              Reset to defaults
+            </Button>
+          </CardFooter>
         </Card>
 
         <Card>

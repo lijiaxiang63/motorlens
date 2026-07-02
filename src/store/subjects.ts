@@ -1,6 +1,7 @@
 // Subject / result / video persistence on top of the IndexedDB wrapper.
 // The quick-test flow (no subject selected) never touches this module.
 
+import { DEFAULT_REFERENCE_THRESHOLDS, type ReferenceThresholds } from '../analysis/thresholds'
 import { SAVE_VIDEO_DEFAULT } from '../config'
 import type { Hand, ReportSubject, SessionReport, TestId } from '../types'
 import {
@@ -130,6 +131,21 @@ export async function getSaveVideoSetting(): Promise<boolean> {
 
 export function setSaveVideoSetting(value: boolean): Promise<void> {
   return idbPut(STORE_SETTINGS, { key: 'saveVideo', value })
+}
+
+/** User-configurable reference cues for PDF/on-screen metric flags (Phase 3)
+ *  — cues, not validated clinical norms. The stored row is authoritative as a
+ *  whole: clearing a default cue and saving keeps it cleared. */
+export async function getReferenceThresholds(): Promise<ReferenceThresholds> {
+  const row = await idbGet<{ key: string; value: ReferenceThresholds }>(
+    STORE_SETTINGS,
+    'referenceThresholds',
+  )
+  return row?.value ?? DEFAULT_REFERENCE_THRESHOLDS
+}
+
+export function setReferenceThresholds(value: ReferenceThresholds): Promise<void> {
+  return idbPut(STORE_SETTINGS, { key: 'referenceThresholds', value })
 }
 
 // --- report embedding ---

@@ -5,10 +5,12 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { deltaTone, formatDelta, metricByKey, type MetricKey } from '../../analysis/metricCatalog'
+import { DEFAULT_REFERENCE_THRESHOLDS, evaluateThreshold } from '../../analysis/thresholds'
 import { deltasVsPrevious } from '../../analysis/trends'
 import { HAND_SCALE_CV_WARN_PCT } from '../../config'
 import { buildSessionReport, downloadReport } from '../../report/export'
 import {
+  getReferenceThresholds,
   getResult,
   getSaveVideoSetting,
   listResults,
@@ -179,6 +181,25 @@ export function ResultsScreen({ result: r }: { result: ResultProps }) {
     return { text: formatDelta(chipDef, delta), tone }
   }
 
+  // --- reference-cue flags (read-only load; initialized to the shipped
+  // defaults so a metric card never briefly renders unflagged while the
+  // IDB read is in flight) ---
+  const [thresholds, setThresholds] = useState(DEFAULT_REFERENCE_THRESHOLDS)
+  useEffect(() => {
+    let alive = true
+    void getReferenceThresholds().then((t) => {
+      if (alive) setThresholds(t)
+    })
+    return () => {
+      alive = false
+    }
+  }, [])
+
+  function flaggedTone(key: MetricKey): 'warn' | undefined {
+    const value = metricByKey(key).getter(m)
+    return evaluateThreshold(thresholds[key], value) ? 'warn' : undefined
+  }
+
   // --- quality warnings ---
   const warnings: string[] = []
   if (q.detectionRate < 0.9) {
@@ -311,42 +332,48 @@ export function ResultsScreen({ result: r }: { result: ResultProps }) {
           label={noun}
           value={String(m.count)}
           sub={`in ${(durationMs / 1000).toFixed(durationMs % 1000 === 0 ? 0 : 1)} s`}
-          tone="accent"
+          tone={flaggedTone('count') ?? 'accent'}
           delta={chipFor('count')}
         />
         <MetricCard
           label="Frequency"
           value={fmt(m.frequencyHz, 2, ' Hz')}
+          tone={flaggedTone('frequencyHz')}
           delta={chipFor('frequencyHz')}
         />
         <MetricCard
           label="Amplitude (mean)"
           value={fmt(m.amplitudeMean, 2)}
           sub={cmSub(m.amplitudeMean)}
+          tone={flaggedTone('amplitudeMean')}
           delta={chipFor('amplitudeMean')}
         />
         <MetricCard
           label="Amplitude (max)"
           value={fmt(m.amplitudeMax, 2)}
           sub={cmSub(m.amplitudeMax)}
+          tone={flaggedTone('amplitudeMax')}
           delta={chipFor('amplitudeMax')}
         />
         <MetricCard
           label={`${def.closingLabel} (mean)`}
           value={fmt(m.closingVelMean, 1, ' u/s')}
           sub={cmVelSub(m.closingVelMean)}
+          tone={flaggedTone('closingVelMean')}
           delta={chipFor('closingVelMean')}
         />
         <MetricCard
           label={`${def.closingLabel} (peak)`}
           value={fmt(m.closingVelPeak, 1, ' u/s')}
           sub={cmVelSub(m.closingVelPeak)}
+          tone={flaggedTone('closingVelPeak')}
           delta={chipFor('closingVelPeak')}
         />
         <MetricCard
           label={`${def.openingLabel} (mean)`}
           value={fmt(m.openingVelMean, 1, ' u/s')}
           sub={cmVelSub(m.openingVelMean)}
+          tone={flaggedTone('openingVelMean')}
           delta={chipFor('openingVelMean')}
         />
         <MetricCard
@@ -357,18 +384,20 @@ export function ResultsScreen({ result: r }: { result: ResultProps }) {
               ? `thirds: ${fmt(m.amplitudeDecrement.thirdsPct, 0, '%')}`
               : undefined
           }
-          tone={(m.amplitudeDecrement.regressionPct ?? 0) > 20 ? 'warn' : undefined}
+          tone={flaggedTone('ampDecrementPct')}
           delta={chipFor('ampDecrementPct')}
         />
         <MetricCard
           label="Velocity decrement"
           value={fmt(m.velocityDecrement.regressionPct, 0, '%')}
+          tone={flaggedTone('velDecrementPct')}
           delta={chipFor('velDecrementPct')}
         />
         <MetricCard
           label="Rhythm variability"
           value={fmt(m.rhythm.itiCvPct, 0, '%')}
           sub="CV of intervals"
+          tone={flaggedTone('itiCvPct')}
           delta={chipFor('itiCvPct')}
         />
         <MetricCard
@@ -379,12 +408,13 @@ export function ResultsScreen({ result: r }: { result: ResultProps }) {
               ? `longest pause ${fmt(m.rhythm.longestPauseMs / 1000, 2, ' s')}`
               : undefined
           }
-          tone={m.rhythm.hesitationCount > 0 ? 'warn' : undefined}
+          tone={flaggedTone('hesitationCount')}
           delta={chipFor('hesitationCount')}
         />
         <MetricCard
           label="Mean interval"
           value={fmt(m.rhythm.itiMeanMs, 0, ' ms')}
+          tone={flaggedTone('itiMeanMs')}
           delta={chipFor('itiMeanMs')}
         />
       </div>
