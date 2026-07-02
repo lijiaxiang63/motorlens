@@ -31,7 +31,7 @@ export function createResultsScreen(ctx: AppContext, r: ResultProps): ScreenInst
   }
   if (q.handScaleCvPct > HAND_SCALE_CV_WARN_PCT) {
     warnings.push(
-      `Camera distance varied during the test (hand-scale CV ${q.handScaleCvPct.toFixed(0)}%) — amplitude values are less reliable.`,
+      `Hand position varied a lot during the test (scale CV ${q.handScaleCvPct.toFixed(0)}%) — for best tracking, keep a steady distance from the camera.`,
     )
   }
   if (q.meanFps < 15) {

@@ -1,31 +1,24 @@
 // Home: live preview with skeleton overlay, source/detection status,
 // test selection, and session-JSON import (drag-drop or file picker).
 
-import { drawHand } from '../../tracking/overlay'
 import { TEST_DEFS, testDefById } from '../../protocol/definitions'
 import { createReplaySource } from '../../replay/replaySource'
 import { parseSessionJson } from '../../report/export'
 import type { Hand, LandmarkFrame, SourceStatus } from '../../types'
 import type { AppContext, ScreenInstance } from '../app'
 import { h, statusChip } from '../components'
+import { createPreviewPanel } from '../preview'
 
 export function createHomeScreen(ctx: AppContext): ScreenInstance {
   const source = ctx.source
   let hand: Hand = 'right'
   let lastFrame: LandmarkFrame | null = null
-  let raf = 0
   const recvTimes: number[] = []
 
   // --- preview panel ---
-  const overlay = h('canvas', { class: 'preview-overlay' })
-  const badgeText =
-    source.kind === 'camera' ? null : source.kind === 'replay' ? 'REPLAY' : 'SYNTHETIC'
-  const previewPanel = h(
-    'div',
-    { class: 'preview-panel' },
-    source.video,
-    overlay,
-    badgeText ? h('div', { class: 'source-badge' }, badgeText) : null,
+  const preview = createPreviewPanel(source)
+  const previewPanel = preview.el
+  previewPanel.append(
     h('div', { class: 'drop-hint' }, 'Drop a MotorLens session .json here to replay it'),
   )
 
@@ -180,25 +173,6 @@ export function createHomeScreen(ctx: AppContext): ScreenInstance {
     if (f) void importFile(f)
   })
 
-  // --- overlay drawing ---
-  function draw() {
-    raf = requestAnimationFrame(draw)
-    const w = previewPanel.clientWidth
-    const hgt = previewPanel.clientHeight
-    if (w === 0) return
-    const dpr = window.devicePixelRatio || 1
-    if (overlay.width !== w * dpr || overlay.height !== hgt * dpr) {
-      overlay.width = w * dpr
-      overlay.height = hgt * dpr
-    }
-    const g = overlay.getContext('2d')!
-    g.setTransform(dpr, 0, 0, dpr, 0, 0)
-    g.clearRect(0, 0, w, hgt)
-    if (lastFrame?.landmarks) {
-      drawHand(g, lastFrame.landmarks, w, hgt, { mirror: source.kind === 'camera' })
-    }
-  }
-
   // --- error rendering for camera failures ---
   function renderError() {
     if (statusState.state !== 'error') {
@@ -224,6 +198,7 @@ export function createHomeScreen(ctx: AppContext): ScreenInstance {
 
   const unsubFrames = source.subscribe((f) => {
     lastFrame = f
+    preview.setFrame(f)
     recvTimes.push(performance.now())
     while (recvTimes.length > 0 && recvTimes[0]! < performance.now() - 2000) recvTimes.shift()
   })
@@ -236,7 +211,6 @@ export function createHomeScreen(ctx: AppContext): ScreenInstance {
 
   renderChips()
   renderCards()
-  draw()
 
   const el = h(
     'div',
@@ -259,7 +233,7 @@ export function createHomeScreen(ctx: AppContext): ScreenInstance {
   return {
     el,
     destroy() {
-      cancelAnimationFrame(raf)
+      preview.destroy()
       clearInterval(chipTimer)
       unsubFrames()
       unsubStatus()

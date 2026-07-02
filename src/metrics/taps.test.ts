@@ -1,7 +1,29 @@
 import { describe, expect, it } from 'vitest'
-import { makeTapFrames } from '../replay/synthetic'
+import { makeTapFrames, SYNTH_ASPECT } from '../replay/synthetic'
 import { cvPct } from '../signal/stats'
+import type { LandmarkFrame } from '../types'
 import { computeTapMetrics } from './taps'
+
+/** Rigidly pitch the hand about the wrist (palm tilting toward/away from the
+ *  camera), re-projecting the image landmarks — shrinks 2-D projections but
+ *  leaves 3-D geometry untouched. */
+function pitchWobble(frames: LandmarkFrame[], maxDeg: number, freqHz: number): LandmarkFrame[] {
+  return frames.map((f) => {
+    if (!f.world) return f
+    const th = ((maxDeg * Math.PI) / 180) * Math.sin((2 * Math.PI * freqHz * f.t) / 1000)
+    const world = f.world.map((p) => ({
+      x: p.x,
+      y: p.y * Math.cos(th) - p.z * Math.sin(th),
+      z: p.y * Math.sin(th) + p.z * Math.cos(th),
+    }))
+    const landmarks = world.map((w) => ({
+      x: 0.5 + w.x / SYNTH_ASPECT,
+      y: 0.55 + w.y,
+      z: w.z / SYNTH_ASPECT,
+    }))
+    return { ...f, world, landmarks }
+  })
+}
 
 describe('computeTapMetrics on synthetic ground truth', () => {
   it('recovers count, frequency, and amplitude of steady 2 Hz tapping', () => {
@@ -27,6 +49,20 @@ describe('computeTapMetrics on synthetic ground truth', () => {
     expect(metrics.rhythm.hesitationCount).toBe(0)
     expect(quality.detectionRate).toBe(1)
     expect(quality.meanFps).toBeCloseTo(30, 0)
+  })
+
+  it('is immune to palm tilt that shrinks the 2-D projection', () => {
+    const { frames, truth } = makeTapFrames({ freqHz: 2 })
+    const { metrics, quality } = computeTapMetrics(pitchWobble(frames, 35, 1))
+
+    // Metrics ride on 3-D world geometry, which rigid rotation preserves.
+    expect(Math.abs(metrics.count - truth.count)).toBeLessThanOrEqual(1)
+    expect(Math.abs(metrics.frequencyHz! - 2)).toBeLessThan(0.05)
+    expect(metrics.amplitudeMean).toBeGreaterThan(0.7)
+    expect(metrics.amplitudeMean).toBeLessThan(0.95)
+    expect(Math.abs(metrics.amplitudeDecrement.regressionPct ?? 99)).toBeLessThan(5)
+    // …while the projected hand size did wobble, which quality reports.
+    expect(quality.handScaleCvPct).toBeGreaterThan(4)
   })
 
   it('works with noise at a higher rate', () => {

@@ -35,17 +35,23 @@ export const TAP_HESITATION_ABS_MS = 400
 export const FIST_HESITATION_ABS_MS = 700
 /** Trailing median window (in detected frames) for the hand-scale signal. */
 export const HAND_SCALE_MEDIAN_WINDOW = 15
-/** Warn when hand-scale CV exceeds this (camera distance changed), %. */
-export const HAND_SCALE_CV_WARN_PCT = 15
+/**
+ * Warn when the projected hand-scale CV exceeds this, %. Movement signals
+ * come from rotation-invariant world landmarks, so this no longer affects
+ * amplitudes — it is a positioning-stability indicator (normal palm tilt
+ * during tapping/clenching produces ~5–15%, hence the high threshold).
+ */
+export const HAND_SCALE_CV_WARN_PCT = 25
 
 // --- Hand tracking ---
 /**
- * tasks-vision reports handedness assuming a mirrored (selfie) image, but
- * getUserMedia frames are unmirrored, so the label is swapped relative to
- * the user's physical hand. Verified via the manual checklist in README;
- * flip this once if your platform reports the opposite.
+ * Whether to swap MediaPipe's Left/Right handedness label to get the user's
+ * physical hand. Verified empirically on this machine (Chrome + built-in
+ * camera, 2026-07-02): the raw labels already match the physical hand for
+ * unmirrored getUserMedia input, so no swap. If your platform reports the
+ * opposite (right hand detected as left), flip this.
  */
-export const SWAP_RAW_HANDEDNESS = true
+export const SWAP_RAW_HANDEDNESS = false
 
 export const MEDIAPIPE_VERSION = '0.10.35'
 export const LOCAL_WASM_BASE = '/mediapipe/wasm'

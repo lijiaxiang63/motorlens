@@ -38,6 +38,19 @@ npm install        # also copies the MediaPipe wasm runtime and downloads the
 npm run dev        # http://localhost:5173
 ```
 
+### LAN access (other devices on your network)
+
+```bash
+npm run dev:lan    # generates a self-signed cert on first run, then serves
+                   # https://<your-ip>:5173 on all interfaces
+```
+
+Open the `Network:` URL Vite prints (e.g. `https://10.10.1.6:5173`) from the
+other device and accept the one-time certificate warning — HTTPS is required
+because browsers only allow camera access on secure origins (plain
+`http://<ip>` would load, but with the camera disabled). macOS may ask to
+allow `node` to accept incoming connections the first time; click Allow.
+
 Camera access requires `localhost` or HTTPS. If the model download fails
 (offline install), the app falls back to CDN URLs at runtime; to be fully
 offline, download it manually:
@@ -49,11 +62,12 @@ curl -L -o public/mediapipe/hand_landmarker.task \
 
 ## Metric definitions
 
-All distances are **scale-normalized**: divided by the hand scale `S` =
-wrist→middle-MCP distance (landmarks 0→9) measured per frame, so values are
-independent of how far the hand is from the camera. One "hand unit" ≈ one
-palm length; the world-landmark estimate of `S` in cm gives the secondary
-`≈ cm` values (typical adult ≈ 8 cm).
+Movement signals are measured on MediaPipe's metric 3-D **world landmarks**,
+so neither camera distance nor hand rotation (palm tilt during taps/clenches)
+distorts them. All distances are **scale-normalized**: divided by the hand
+scale `S` = wrist→middle-MCP distance (landmarks 0→9). One "hand unit" ≈ one
+palm length; `S` in cm gives the secondary `≈ cm` values (typical adult
+≈ 8 cm).
 
 | Metric | Definition |
 |---|---|
@@ -101,7 +115,9 @@ npm run build
    overlay should track your hand and mirror naturally.
 2. Raise your **right** hand → the status chip must read "right hand
    detected". If it says left, flip `SWAP_RAW_HANDEDNESS` in
-   [src/config.ts](src/config.ts) (platform-dependent, at most once).
+   [src/config.ts](src/config.ts) (platform-dependent, at most once; the
+   current default of `false` was verified on macOS Chrome with the
+   built-in camera).
 3. Finger tap test: tap exactly 10 slow taps → count should be 10.
 4. Tap steadily while moving your hand closer/farther → amplitude stays
    roughly constant (scale normalization).

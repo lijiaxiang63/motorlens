@@ -1,8 +1,15 @@
 // Landmark geometry → normalized 1-D movement signals.
 //
-// All distances are divided by the hand scale |P0−P9| (wrist to middle MCP)
-// measured in aspect-corrected image units, so signals are invariant to how
-// far the hand is from the camera. "Hand units" ≈ multiples of palm length.
+// Movement signals are computed from MediaPipe *world* landmarks (metric 3-D
+// coordinates): rigid rotation of the hand does not change 3-D distances, so
+// palm tilt during tapping/clenching cannot modulate amplitudes the way it
+// would with projected 2-D distances. Signals are divided by the world hand
+// scale |W0−W9| (wrist to middle MCP) — "hand units" ≈ palm lengths — which
+// also makes them independent of the person's hand size.
+//
+// Projected image-space distances remain in use for what they actually
+// measure: framing (too close / too far gates) and positioning stability
+// (quality reporting).
 
 import { HAND_SCALE_MEDIAN_WINDOW } from '../config'
 import { mean, median } from '../signal/stats'
@@ -25,8 +32,14 @@ export function dist3D(a: Vec3, b: Vec3): number {
   return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)
 }
 
+/** Projected hand size in image space — for framing gates and quality. */
 export function rawHandScale(landmarks: Vec3[], aspect: number): number {
   return dist2D(landmarks[WRIST]!, landmarks[MIDDLE_MCP]!, aspect)
+}
+
+/** Metric hand size from world landmarks (≈ constant for a given hand). */
+export function worldHandScale(world: Vec3[]): number {
+  return dist3D(world[WRIST]!, world[MIDDLE_MCP]!)
 }
 
 /** Trailing-median smoother for the hand-scale divisor (robust to blips). */
@@ -44,22 +57,22 @@ export class ScaleSmoother {
   }
 }
 
-/** Thumb-tip ↔ index-tip separation (finger tapping), height units. */
-export function tapRaw(lm: Vec3[], aspect: number): number {
-  return dist2D(lm[THUMB_TIP]!, lm[INDEX_TIP]!, aspect)
+/** Thumb-tip ↔ index-tip separation (finger tapping), meters (world). */
+export function tapRaw(world: Vec3[]): number {
+  return dist3D(world[THUMB_TIP]!, world[INDEX_TIP]!)
 }
 
-/** Mean fingertip-to-wrist distance (hand aperture), height units. */
-export function apertureRaw(lm: Vec3[], aspect: number): number {
+/** Mean fingertip-to-wrist distance (hand aperture), meters (world). */
+export function apertureRaw(world: Vec3[]): number {
   let s = 0
-  for (const tip of APERTURE_TIPS) s += dist2D(lm[tip]!, lm[WRIST]!, aspect)
+  for (const tip of APERTURE_TIPS) s += dist3D(world[tip]!, world[WRIST]!)
   return s / APERTURE_TIPS.length
 }
 
 export interface ExtractedSignal {
   /** Normalized signal sampled at detected frames only. */
   series: Series
-  /** Raw (unsmoothed) hand-scale values per detected frame. */
+  /** Projected image-space hand-scale per detected frame (quality only). */
   rawScales: number[]
   /** Centimeters per hand unit from world landmarks, null if unavailable. */
   cmPerUnit: number | null
@@ -67,7 +80,7 @@ export interface ExtractedSignal {
 
 export function extractSignal(
   frames: LandmarkFrame[],
-  raw: (lm: Vec3[], aspect: number) => number,
+  raw: (world: Vec3[]) => number,
 ): ExtractedSignal {
   const t: number[] = []
   const v: number[] = []
@@ -75,14 +88,14 @@ export function extractSignal(
   const worldScales: number[] = []
   const smoother = new ScaleSmoother()
   for (const f of frames) {
-    if (!f.landmarks) continue
-    const rs = rawHandScale(f.landmarks, f.aspect)
-    if (rs < 1e-6) continue
-    rawScales.push(rs)
-    const scale = smoother.push(rs)
+    if (!f.landmarks || !f.world) continue
+    const ws = worldHandScale(f.world)
+    if (ws < 1e-6) continue
+    rawScales.push(rawHandScale(f.landmarks, f.aspect))
+    worldScales.push(ws)
+    const scale = smoother.push(ws)
     t.push(f.t)
-    v.push(raw(f.landmarks, f.aspect) / scale)
-    if (f.world) worldScales.push(dist3D(f.world[WRIST]!, f.world[MIDDLE_MCP]!))
+    v.push(raw(f.world) / scale)
   }
   return {
     series: { t, v },

@@ -56,12 +56,13 @@ export const HAND_TEMPLATE: readonly Vec3[] = [
 ]
 
 /** World (meters, wrist origin) → frame. Image x is compressed by 1/aspect so
- *  aspect-corrected image distances equal world distances 1:1. */
+ *  aspect-corrected image distances equal world distances 1:1; image z uses
+ *  MediaPipe's convention of being scaled like x. */
 function toFrame(world: Vec3[], tMs: number, handedness: Hand): LandmarkFrame {
   const landmarks = world.map((w) => ({
     x: 0.5 + w.x / SYNTH_ASPECT,
     y: 0.55 + w.y,
-    z: w.z,
+    z: w.z / SYNTH_ASPECT,
   }))
   return { t: tMs, landmarks, world, handedness, score: 1, aspect: SYNTH_ASPECT }
 }

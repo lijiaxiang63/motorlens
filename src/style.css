@@ -319,16 +319,36 @@ p {
 
 .recording-hint { font-size: 13px; }
 
-.record-body {
+.record-grid {
   display: grid;
-  grid-template-columns: 170px 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 16px;
-  align-items: center;
-  margin-top: 8px;
+  align-items: stretch;
+  margin-bottom: 16px;
 }
 
-@media (max-width: 720px) {
-  .record-body { grid-template-columns: 1fr; }
+.record-side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.record-side .stage { flex: 1; }
+
+.monitor-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 3fr);
+  gap: 16px;
+  align-items: start;
+  margin-bottom: 8px;
+}
+
+.monitor-grid .preview-panel { position: sticky; top: 12px; }
+
+@media (max-width: 860px) {
+  .record-grid,
+  .monitor-grid { grid-template-columns: 1fr; }
 }
 
 .count-panel {
@@ -365,7 +385,6 @@ p {
 /* Grid/flex children must be allowed to shrink below their content width,
    or canvas charts inflate their own track. */
 .chart-row > div,
-.record-body > div,
 .home-grid > div {
   min-width: 0;
 }

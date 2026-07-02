@@ -15,6 +15,7 @@ export function createCameraSource(): FrameSource {
   let landmarker: Awaited<ReturnType<typeof createHandLandmarker>> | null = null
   let lastTs = 0
   let started = false
+  let detectFailures = 0
 
   const subs = new Set<(f: LandmarkFrame) => void>()
   const statusSubs = new Set<(s: SourceStatus) => void>()
@@ -23,6 +24,17 @@ export function createCameraSource(): FrameSource {
   function setStatus(s: SourceStatus) {
     status = s
     for (const cb of statusSubs) cb(s)
+  }
+
+  /** One broken consumer must not take down the producer or its peers. */
+  function emit(frame: LandmarkFrame) {
+    for (const cb of subs) {
+      try {
+        cb(frame)
+      } catch (err) {
+        console.error('[motorlens] frame subscriber failed', err)
+      }
+    }
   }
 
   return {
@@ -50,23 +62,33 @@ export function createCameraSource(): FrameSource {
         return
       }
 
-      stopClock = startFrameClock(video, (mediaTimeMs) => {
+      stopClock = startFrameClock(video, (tMs) => {
         if (!landmarker || !video) return
         // detectForVideo requires strictly increasing integer timestamps.
-        const ts = Math.max(lastTs + 1, Math.round(mediaTimeMs))
+        const ts = Math.max(lastTs + 1, Math.round(tMs))
         lastTs = ts
-        const res = landmarker.detectForVideo(video, ts)
-        const lm = res.landmarks[0] ?? null
-        const cat = res.handedness[0]?.[0]
-        const frame: LandmarkFrame = {
+        // A transient detector error becomes a "no hand" frame, keeping time
+        // flowing, instead of freezing the app.
+        let res: ReturnType<NonNullable<typeof landmarker>['detectForVideo']> | null = null
+        try {
+          res = landmarker.detectForVideo(video, ts)
+          detectFailures = 0
+        } catch (err) {
+          detectFailures++
+          if (detectFailures <= 3 || detectFailures % 100 === 0) {
+            console.warn(`[motorlens] detectForVideo failed (x${detectFailures})`, err)
+          }
+        }
+        const lm = res?.landmarks[0] ?? null
+        const cat = res?.handedness[0]?.[0]
+        emit({
           t: ts,
           landmarks: lm,
-          world: res.worldLandmarks[0] ?? null,
+          world: res?.worldLandmarks[0] ?? null,
           handedness: lm ? normalizeHandedness(cat?.categoryName) : null,
           score: lm ? (cat?.score ?? 1) : 0,
           aspect: video.videoWidth > 0 ? video.videoWidth / video.videoHeight : 4 / 3,
-        }
-        for (const cb of subs) cb(frame)
+        })
       })
     },
     stop() {

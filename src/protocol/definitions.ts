@@ -25,7 +25,10 @@ export interface TestDefinition {
   openingLabel: string
   liveYRange: readonly [number, number]
   fcHz: number
-  rawSignal(lm: Vec3[], aspect: number): number
+  /** Landmark indices emphasized on the skeleton overlay during the test. */
+  highlightLandmarks: readonly number[]
+  /** Raw movement signal from world landmarks, meters. */
+  rawSignal(world: Vec3[]): number
   compute(frames: LandmarkFrame[]): CycleAnalysis
 }
 
@@ -43,6 +46,7 @@ export const FINGER_TAP: TestDefinition = {
   openingLabel: 'Opening speed',
   liveYRange: TAP_LIVE_Y_RANGE,
   fcHz: TAP_FC_HZ,
+  highlightLandmarks: [4, 8],
   rawSignal: tapRaw,
   compute: computeTapMetrics,
 }
@@ -61,6 +65,7 @@ export const FIST_OPEN_CLOSE: TestDefinition = {
   openingLabel: 'Opening speed',
   liveYRange: FIST_LIVE_Y_RANGE,
   fcHz: FIST_FC_HZ,
+  highlightLandmarks: [0, 8, 12, 16, 20],
   rawSignal: apertureRaw,
   compute: computeFistMetrics,
 }

@@ -20,7 +20,7 @@ import { extractSignal, splitSeries } from './kinematics'
 import { computeRhythm } from './rhythm'
 
 export interface CycleTestParams {
-  raw: (lm: Vec3[], aspect: number) => number
+  raw: (world: Vec3[]) => number
   fcHz: number
   promFloor: number
   minDistanceMs: number

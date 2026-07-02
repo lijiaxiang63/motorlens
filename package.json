@@ -6,6 +6,7 @@
   "description": "Camera-based hand motor function assessment — finger tapping, fist open-close, and joint kinematics from MediaPipe hand tracking.",
   "scripts": {
     "dev": "vite",
+    "dev:lan": "node scripts/ensure-cert.mjs && LAN=1 vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview",
     "test": "vitest run",
@@ -19,6 +20,7 @@
     "uplot": "^1.6.32"
   },
   "devDependencies": {
+    "@types/node": "^26.1.0",
     "typescript": "^6.0.3",
     "vite": "^8.1.2",
     "vitest": "^4.1.9"

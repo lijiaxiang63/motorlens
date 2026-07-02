@@ -1,20 +1,22 @@
-// Record screen: positioning gate → countdown → timed recording with a live
-// signal chart and running event count → hands off to the results screen.
+// Record screen: live skeleton preview + positioning gate → countdown →
+// timed recording with a live signal chart and running event count → hands
+// off to the results screen.
 
 import { LIVE_CHART_WINDOW_MS, LIVE_COUNT_THROTTLE_MS } from '../../config'
-import { rawHandScale, ScaleSmoother } from '../../metrics/kinematics'
+import { ScaleSmoother, worldHandScale } from '../../metrics/kinematics'
 import type { TestDefinition } from '../../protocol/definitions'
 import { TestSession, type Phase, type PositioningIssue } from '../../protocol/testSession'
 import { LiveEma } from '../../signal/filters'
 import type { Hand } from '../../types'
 import type { AppContext, ScreenInstance } from '../app'
-import { createStreamChart } from '../liveChart'
 import { h } from '../components'
+import { createStreamChart } from '../liveChart'
+import { createPreviewPanel } from '../preview'
 
 const ISSUE_TEXT: Record<PositioningIssue, string> = {
   warming_up: 'Looking for your hand…',
   no_hand: 'Show your hand to the camera',
-  wrong_hand: 'That looks like the other hand — switch hands or go back to change the setting',
+  wrong_hand: '', // composed dynamically with the detected hand
   too_far: 'Move your hand closer to the camera',
   too_close: 'Move your hand a little further away',
   low_fps: 'Frame rate is low — close other apps or improve lighting',
@@ -28,7 +30,9 @@ export function createRecordScreen(ctx: AppContext, def: TestDefinition, hand: H
   let started = false
   let finished = false
   let lastCountT = -Infinity
+  let lastDetectedHand: Hand | null = null
 
+  const preview = createPreviewPanel(ctx.source, { highlight: def.highlightLandmarks })
   const stage = h('div', { class: 'stage' })
   const countEl = h('div', { class: 'live-count', style: 'visibility:hidden' }, '0')
   const chartEl = h('div', { class: 'chart-panel' })
@@ -36,6 +40,12 @@ export function createRecordScreen(ctx: AppContext, def: TestDefinition, hand: H
     yRange: def.liveYRange,
     windowMs: LIVE_CHART_WINDOW_MS,
   })
+
+  function issueText(i: PositioningIssue): string {
+    if (i !== 'wrong_hand') return ISSUE_TEXT[i]
+    const seen = lastDetectedHand ?? 'other'
+    return `Detected the ${seen} hand — this test is set for the ${hand} hand. Switch hands, or go Home to change the setting.`
+  }
 
   function renderPhase(p: Phase) {
     switch (p.kind) {
@@ -45,7 +55,7 @@ export function createRecordScreen(ctx: AppContext, def: TestDefinition, hand: H
           h(
             'div',
             { class: 'issues' },
-            ...p.issues.map((i) => h('div', { class: 'issue' }, ISSUE_TEXT[i])),
+            ...p.issues.map((i) => h('div', { class: 'issue' }, issueText(i))),
           ),
         )
         break
@@ -99,9 +109,11 @@ export function createRecordScreen(ctx: AppContext, def: TestDefinition, hand: H
 
   const unsubFrames = ctx.source.subscribe((f) => {
     session.onFrame(f)
-    if (f.landmarks) {
-      const scale = scaler.push(rawHandScale(f.landmarks, f.aspect))
-      chart.push(f.t, ema.push(f.t, def.rawSignal(f.landmarks, f.aspect) / scale))
+    preview.setFrame(f)
+    if (f.handedness) lastDetectedHand = f.handedness
+    if (f.world) {
+      const scale = scaler.push(worldHandScale(f.world))
+      chart.push(f.t, ema.push(f.t, def.rawSignal(f.world) / scale))
     }
   })
   const unsubPhase = session.subscribe(renderPhase)
@@ -129,13 +141,18 @@ export function createRecordScreen(ctx: AppContext, def: TestDefinition, hand: H
         'Cancel',
       ),
     ),
-    stage,
     h(
       'div',
-      { class: 'record-body' },
-      h('div', { class: 'count-panel' }, countEl, h('div', { class: 'muted small' }, def.eventNoun[1])),
-      chartEl,
+      { class: 'record-grid' },
+      preview.el,
+      h(
+        'div',
+        { class: 'record-side' },
+        stage,
+        h('div', { class: 'count-panel' }, countEl, h('div', { class: 'muted small' }, def.eventNoun[1])),
+      ),
     ),
+    chartEl,
   )
 
   return {
@@ -143,6 +160,7 @@ export function createRecordScreen(ctx: AppContext, def: TestDefinition, hand: H
     destroy() {
       unsubFrames()
       unsubPhase()
+      preview.destroy()
       chart.destroy()
     },
   }

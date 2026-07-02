@@ -63,7 +63,13 @@ export function createReplaySource(
     while (emitted < MAX_BATCH && frameT(idx, epoch) <= nowT) {
       const f = norm[idx]!
       const t = frameT(idx, epoch)
-      for (const cb of subs) cb({ ...f, t })
+      for (const cb of subs) {
+        try {
+          cb({ ...f, t })
+        } catch (err) {
+          console.error('[motorlens] frame subscriber failed', err)
+        }
+      }
       emitted++
       idx++
       if (idx >= norm.length) {

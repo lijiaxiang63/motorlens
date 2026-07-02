@@ -8,6 +8,7 @@ import type { Hand, JointId, LandmarkFrame } from '../../types'
 import type { AppContext, ScreenInstance } from '../app'
 import { createStreamChart, type StreamChart } from '../liveChart'
 import { fmt, h } from '../components'
+import { createPreviewPanel } from '../preview'
 
 const FINGERS = ['thumb', 'index', 'middle', 'ring', 'pinky'] as const
 const JOINT_COLUMNS: Record<(typeof FINGERS)[number], readonly [JointId, JointId, JointId]> = {
@@ -27,6 +28,7 @@ export function createMonitorScreen(ctx: AppContext): ScreenInstance {
   let frames: LandmarkFrame[] = []
   let lastHand: Hand = 'right'
   let chart: StreamChart | null = null
+  const preview = createPreviewPanel(ctx.source)
 
   const chartEl = h('div', { class: 'chart-panel' })
   const chartTitle = h('h3', { class: 'section-title' }, chartLabel(selected))
@@ -105,6 +107,7 @@ export function createMonitorScreen(ctx: AppContext): ScreenInstance {
 
   const unsub = ctx.source.subscribe((f) => {
     tracker.push(f)
+    preview.setFrame(f)
     if (f.handedness) lastHand = f.handedness
     frames.push(f)
     const cutoff = f.t - FRAME_BUFFER_MS
@@ -154,7 +157,7 @@ export function createMonitorScreen(ctx: AppContext): ScreenInstance {
         h('button', { class: 'btn primary', onclick: () => ctx.navigate({ name: 'home' }) }, 'Home'),
       ),
     ),
-    table,
+    h('div', { class: 'monitor-grid' }, preview.el, table),
     chartTitle,
     detailEl,
     chartEl,
@@ -165,6 +168,7 @@ export function createMonitorScreen(ctx: AppContext): ScreenInstance {
     destroy() {
       unsub()
       clearInterval(tableTimer)
+      preview.destroy()
       chart?.destroy()
     },
   }

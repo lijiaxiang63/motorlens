@@ -91,7 +91,9 @@ export interface QualityMetrics {
   /** Fraction of frames with a detected hand, 0..1. */
   detectionRate: number
   droppedIntervals: number
-  /** CV of the raw hand-scale signal, % — high means camera distance moved. */
+  /** CV of the projected hand size, % — positioning-stability indicator
+   *  (distance changes and palm tilt both raise it; amplitudes are computed
+   *  from rotation-invariant world landmarks and are unaffected). */
   handScaleCvPct: number
 }
 
