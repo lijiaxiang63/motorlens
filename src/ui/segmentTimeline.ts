@@ -3,7 +3,6 @@
 
 import { SEG_CONFIDENCE_WARN } from '../config'
 import type { Hand } from '../types'
-import { h } from './components'
 
 export interface EditableSegment {
   startMs: number
@@ -37,16 +36,21 @@ function cssVar(name: string): string {
 }
 
 export function createSegmentTimeline(opts: SegmentTimelineOpts): SegmentTimeline {
-  const canvas = h('canvas', { class: 'segment-timeline' })
-  const el = h('div', { class: 'timeline-panel' }, canvas)
+  const canvas = document.createElement('canvas')
+  canvas.className = 'block h-16 w-full cursor-pointer'
+  const el = document.createElement('div')
+  el.className = 'rounded-xl border bg-surface p-2'
+  el.appendChild(canvas)
   const g = canvas.getContext('2d')!
   let raf = 0
   let width = 0
 
+  // Design tokens (ui/tokens.css); read once at construction — the review
+  // screen recreates the timeline on theme switch.
   const colors = {
-    track: cssVar('--panel-2'),
+    track: cssVar('--surface-2'),
     border: cssVar('--border'),
-    coverage: cssVar('--muted'),
+    coverage: cssVar('--text-muted'),
     tap: cssVar('--accent'),
     fist: cssVar('--ok'),
     warn: cssVar('--warn'),

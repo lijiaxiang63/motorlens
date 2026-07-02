@@ -1,8 +1,11 @@
-import './style.css'
+import '@fontsource-variable/inter/index.css'
+import './ui/tokens.css'
+import { StrictMode } from 'react'
+import { createRoot } from 'react-dom/client'
 import { getPreset } from './replay/presets'
 import { createReplaySource } from './replay/replaySource'
 import type { FrameSource } from './types'
-import { mountApp } from './ui/app'
+import { App } from './ui/root'
 
 const params = new URLSearchParams(location.search)
 
@@ -23,8 +26,12 @@ async function createSource(): Promise<FrameSource> {
 
 const root = document.getElementById('app')!
 void createSource().then((source) => {
-  const ctx = mountApp(root, source)
   void source.start()
-  // Debug/automation handle (used by the headless verification flow).
-  ;(window as unknown as Record<string, unknown>).__ctx = ctx
+  // window.__ctx (the headless-verification handle) is assigned inside
+  // NavProvider once the router exists.
+  createRoot(root).render(
+    <StrictMode>
+      <App source={source} />
+    </StrictMode>,
+  )
 })

@@ -1,5 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
+import tailwindcss from '@tailwindcss/vite'
+import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
 // `npm run dev:lan` sets LAN=1: bind all interfaces and serve HTTPS with the
@@ -13,6 +15,7 @@ const https =
     : undefined
 
 export default defineConfig({
+  plugins: [react(), tailwindcss()],
   server: {
     port: 5173,
     strictPort: true,

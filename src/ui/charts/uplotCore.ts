@@ -1,39 +1,60 @@
 // Thin uPlot wrappers: one streaming chart for live recording, plus static
-// result charts. All x axes are seconds.
+// result charts. All x axes are seconds. Ported unchanged from the vanilla
+// ui/liveChart.ts except that colors come from the design-token layer
+// (readChartPalette) instead of hardcoded hex — see ui/tokens.css.
+//
+// INVARIANT (do not simplify): uPlot mounts on a dedicated inner 100%-width
+// div and resizes only when that div's width actually changes. Observing the
+// padded panel directly, or resizing unconditionally, recreates the classic
+// ResizeObserver ↔ setSize feedback loop inside grid tracks.
 
 import uPlot from 'uplot'
 import 'uplot/dist/uPlot.min.css'
-import { MAX_GAP_MS } from '../config'
-import { linearRegression } from '../signal/stats'
-import type { CycleEvent, Series } from '../types'
+import { MAX_GAP_MS } from '../../config'
+import { linearRegression } from '../../signal/stats'
+import type { CycleEvent, Series } from '../../types'
 
-const C = {
-  line: '#4da3ff',
-  marker: '#ff6b6b',
-  trend: '#ffd166',
-  axis: '#8b93a7',
-  grid: 'rgba(139, 147, 167, 0.14)',
+export interface ChartPalette {
+  line: string
+  marker: string
+  trend: string
+  axis: string
+  grid: string
 }
 
-function axis(label?: string): uPlot.Axis {
+/** Read the current theme's chart tokens (call at chart creation; charts are
+ *  recreated on theme switch so the values stay in sync). */
+export function readChartPalette(): ChartPalette {
+  const s = getComputedStyle(document.documentElement)
+  const v = (name: string, fallback: string) => s.getPropertyValue(name).trim() || fallback
   return {
-    stroke: C.axis,
-    label,
-    labelSize: label ? 14 : undefined,
-    grid: { stroke: C.grid, width: 1 },
-    ticks: { stroke: C.grid, width: 1 },
-    font: '11px system-ui',
+    line: v('--chart-line', '#3987e5'),
+    marker: v('--chart-marker', '#e66767'),
+    trend: v('--chart-trend', '#c98500'),
+    axis: v('--chart-axis', '#8b93a7'),
+    grid: v('--chart-grid', 'rgba(139, 147, 167, 0.14)'),
   }
 }
 
-function baseOpts(width: number, height: number): uPlot.Options {
+function axis(c: ChartPalette, label?: string): uPlot.Axis {
+  return {
+    stroke: c.axis,
+    label,
+    labelSize: label ? 14 : undefined,
+    grid: { stroke: c.grid, width: 1 },
+    ticks: { stroke: c.grid, width: 1 },
+    font: '11px Inter Variable, system-ui',
+  }
+}
+
+function baseOpts(c: ChartPalette, width: number, height: number): uPlot.Options {
   return {
     width,
     height,
     legend: { show: false },
     cursor: { show: false },
     scales: { x: { time: false } },
-    axes: [axis(), axis()],
+    axes: [axis(c), axis(c)],
     series: [{}],
   }
 }
@@ -57,22 +78,28 @@ function observeSize(el: HTMLElement, mount: HTMLElement, u: uPlot, height: numb
   return () => ro.disconnect()
 }
 
-export interface StreamChart {
+export interface StreamChartCore {
   push(tMs: number, v: number): void
   destroy(): void
 }
 
 export function createStreamChart(
   el: HTMLElement,
-  opts: { yRange: readonly [number, number]; windowMs: number; height?: number },
-): StreamChart {
+  opts: {
+    yRange: readonly [number, number]
+    windowMs: number
+    height?: number
+    palette?: ChartPalette
+  },
+): StreamChartCore {
+  const c = opts.palette ?? readChartPalette()
   const height = opts.height ?? 200
   const ts: number[] = []
   const vs: (number | null)[] = []
   const mount = makeMount(el)
-  const o = baseOpts(mount.clientWidth || 600, height)
+  const o = baseOpts(c, mount.clientWidth || 600, height)
   o.scales!.y = { range: () => [opts.yRange[0], opts.yRange[1]] as [number, number] }
-  o.series.push({ stroke: C.line, width: 2, points: { show: false }, spanGaps: false })
+  o.series.push({ stroke: c.line, width: 2, points: { show: false }, spanGaps: false })
   const u = new uPlot(o, [[], []], mount)
   const unobserve = observeSize(el, mount, u, height)
   let lastT = -Infinity
@@ -97,11 +124,12 @@ export function createStreamChart(
     destroy() {
       unobserve()
       u.destroy()
+      mount.remove()
     },
   }
 }
 
-export interface StaticChart {
+export interface StaticChartCore {
   destroy(): void
 }
 
@@ -112,7 +140,9 @@ export function createSignalChart(
   events: CycleEvent[],
   yLabel: string,
   height = 220,
-): StaticChart {
+  palette?: ChartPalette,
+): StaticChartCore {
+  const c = palette ?? readChartPalette()
   // Break the line at tracking gaps.
   const xs: number[] = []
   const ys: (number | null)[] = []
@@ -140,14 +170,14 @@ export function createSignalChart(
     markers[best] = ys[best] ?? null
   }
   const mount = makeMount(el)
-  const o = baseOpts(mount.clientWidth || 600, height)
-  o.axes = [axis('time (s)'), axis(yLabel)]
+  const o = baseOpts(c, mount.clientWidth || 600, height)
+  o.axes = [axis(c, 'time (s)'), axis(c, yLabel)]
   o.series.push(
-    { stroke: C.line, width: 2, points: { show: false }, spanGaps: false },
+    { stroke: c.line, width: 2, points: { show: false }, spanGaps: false },
     {
-      stroke: C.marker,
+      stroke: c.marker,
       paths: () => null,
-      points: { show: true, size: 7, fill: C.marker },
+      points: { show: true, size: 7, fill: c.marker },
     },
   )
   const u = new uPlot(o, [xs, ys as never, markers as never], mount)
@@ -156,6 +186,7 @@ export function createSignalChart(
     destroy() {
       unobserve()
       u.destroy()
+      mount.remove()
     },
   }
 }
@@ -165,18 +196,19 @@ export function createEventChart(
   el: HTMLElement,
   values: number[],
   yLabel: string,
-  opts: { trend?: boolean; height?: number } = {},
-): StaticChart {
+  opts: { trend?: boolean; height?: number; palette?: ChartPalette } = {},
+): StaticChartCore {
+  const c = opts.palette ?? readChartPalette()
   const height = opts.height ?? 200
   const xs = values.map((_, i) => i + 1)
   const mount = makeMount(el)
-  const o = baseOpts(mount.clientWidth || 600, height)
-  o.axes = [axis('event #'), axis(yLabel)]
+  const o = baseOpts(c, mount.clientWidth || 600, height)
+  o.axes = [axis(c, 'event #'), axis(c, yLabel)]
   o.series.push({
-    stroke: C.line,
+    stroke: c.line,
     width: 1,
     dash: [4, 4],
-    points: { show: true, size: 6, fill: C.line },
+    points: { show: true, size: 6, fill: c.line },
   })
   const data: uPlot.AlignedData = [xs, values]
   if (opts.trend && values.length >= 2) {
@@ -185,7 +217,7 @@ export function createEventChart(
       values,
     )
     if (Number.isFinite(slope)) {
-      o.series.push({ stroke: C.trend, width: 2, points: { show: false } })
+      o.series.push({ stroke: c.trend, width: 2, points: { show: false } })
       ;(data as unknown as number[][]).push(xs.map((_, i) => intercept + slope * i))
     }
   }
@@ -195,6 +227,7 @@ export function createEventChart(
     destroy() {
       unobserve()
       u.destroy()
+      mount.remove()
     },
   }
 }

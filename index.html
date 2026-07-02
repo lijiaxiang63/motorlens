@@ -3,11 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="color-scheme" content="dark" />
     <title>MotorLens — Hand Motor Function Assessment</title>
+    <script>
+      // Apply the persisted theme before first paint (no flash). The durable
+      // copy lives in IndexedDB settings; localStorage mirrors it for sync
+      // read at boot. Default follows the OS (matches theme.tsx).
+      try {
+        var pref = localStorage.getItem('motorlens.theme') || 'system'
+        var dark =
+          pref === 'dark' ||
+          (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
+        document.documentElement.classList.toggle('dark', dark)
+        document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
+      } catch (e) {
+        document.documentElement.classList.add('dark')
+      }
+    </script>
   </head>
   <body>
     <div id="app"></div>
-    <script type="module" src="/src/main.ts"></script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
