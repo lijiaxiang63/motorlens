@@ -3,6 +3,7 @@
 // which doubles as a regression harness on real recordings.
 
 import { APP_VERSION } from '../config'
+import { savePlatformFile } from '../platform'
 import type {
   CycleAnalysis,
   Hand,
@@ -68,14 +69,11 @@ export function reportFileName(report: SessionReport): string {
   return `motorlens_${report.test}_${report.hand}_${stamp(report.startedAt)}.json`
 }
 
-export function downloadReport(report: SessionReport): void {
+export async function downloadReport(report: SessionReport): Promise<void> {
   const blob = new Blob([JSON.stringify(report)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = reportFileName(report)
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(url), 5_000)
+  await savePlatformFile(blob, reportFileName(report), [
+    { name: 'MotorLens session', extensions: ['json'] },
+  ])
 }
 
 export function parseSessionJson(text: string): SessionReport {

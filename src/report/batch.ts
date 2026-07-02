@@ -6,6 +6,7 @@
 // videos would need the streaming Zip class + File System Access API.
 
 import { strToU8, zipSync, type Zippable } from 'fflate'
+import { savePlatformFile } from '../platform'
 import type { StoredResult, StoredVideo, Subject } from '../store/subjects'
 import { buildSummaryCsv, buildSummaryRow } from './csv'
 import { reportFileName, stamp } from './export'
@@ -107,11 +108,6 @@ export function batchExportFileName(now = new Date()): string {
   return `motorlens_export_${stamp(now.toISOString())}.zip`
 }
 
-export function downloadBatchExport(blob: Blob): void {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = batchExportFileName()
-  a.click()
-  setTimeout(() => URL.revokeObjectURL(url), 30_000)
+export async function downloadBatchExport(blob: Blob): Promise<void> {
+  await savePlatformFile(blob, batchExportFileName(), [{ name: 'ZIP archive', extensions: ['zip'] }])
 }

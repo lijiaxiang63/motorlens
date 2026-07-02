@@ -233,7 +233,7 @@ export function createSubjectsScreen(ctx: AppContext): ScreenInstance {
       if (destroyed) return
       // Exposed for automated verification (mirrors window.__lastReport).
       ;(window as unknown as Record<string, unknown>).__lastExport = blob
-      downloadBatchExport(blob)
+      await downloadBatchExport(blob)
     } catch (err) {
       if (!destroyed) showError(err)
     } finally {

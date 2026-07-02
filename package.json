@@ -4,14 +4,20 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Camera-based hand motor function assessment — finger tapping, fist open-close, and joint kinematics from MediaPipe hand tracking.",
+  "author": "MotorLens",
+  "main": "dist-electron/main.cjs",
   "scripts": {
     "dev": "vite",
     "dev:lan": "node scripts/ensure-cert.mjs && LAN=1 vite",
+    "dev:app": "node scripts/dev-electron.mjs",
     "build": "tsc --noEmit && vite build",
+    "build:electron": "node scripts/build-electron.mjs",
+    "build:app": "npm run typecheck && npm run typecheck:electron && vite build && npm run build:electron && electron-builder --mac dmg zip",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
+    "typecheck:electron": "tsc -p tsconfig.electron.json --noEmit",
     "assets": "node scripts/fetch-assets.mjs",
     "postinstall": "node scripts/fetch-assets.mjs"
   },
@@ -22,8 +28,39 @@
   },
   "devDependencies": {
     "@types/node": "^26.1.0",
+    "electron": "^43.0.0",
+    "electron-builder": "^26.15.3",
+    "esbuild": "^0.28.1",
     "typescript": "^6.0.3",
     "vite": "^8.1.2",
     "vitest": "^4.1.9"
+  },
+  "build": {
+    "appId": "com.motorlens.app",
+    "productName": "MotorLens",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*"
+    ],
+    "asarUnpack": [
+      "dist/mediapipe/**"
+    ],
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.medical",
+      "identity": null,
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "extendInfo": {
+        "NSCameraUsageDescription": "MotorLens uses your camera to track hand movements for motor function assessment. Video is processed entirely on your device and is only saved if you choose to keep it."
+      }
+    }
   }
 }
