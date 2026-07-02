@@ -93,6 +93,10 @@ export function listAllResults(): Promise<StoredResult[]> {
   return idbGetAll<StoredResult>(STORE_RESULTS)
 }
 
+export function getResult(id: string): Promise<StoredResult | undefined> {
+  return idbGet<StoredResult>(STORE_RESULTS, id)
+}
+
 export function saveResult(result: StoredResult): Promise<void> {
   return idbPut(STORE_RESULTS, result)
 }

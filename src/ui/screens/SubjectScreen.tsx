@@ -24,6 +24,7 @@ import { PageHeader } from '../components/PageHeader'
 import { SubjectForm } from '../components/SubjectForm'
 import { fmt } from '../format'
 import { useNav } from '../nav'
+import { viewStoredResult } from '../viewResult'
 
 const HANDS: readonly Hand[] = ['left', 'right']
 
@@ -289,26 +290,7 @@ export function SubjectScreen({ subjectId, notice }: { subjectId: string; notice
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => {
-                      if (!def) return
-                      // Recompute from stored raw frames — same regression
-                      // harness as the JSON import path.
-                      const frames = r.report.raw.frames
-                      navigate({
-                        name: 'results',
-                        result: {
-                          def,
-                          hand: r.hand,
-                          analysis: def.compute(frames),
-                          frames,
-                          startedAt: r.startedAt,
-                          durationMs: r.report.durationMs,
-                          subject: s,
-                          ...(r.report.source ? { source: r.report.source } : {}),
-                          savedResultId: r.id,
-                        },
-                      })
-                    }}
+                    onClick={() => viewStoredResult(navigate, s, r)}
                   >
                     View
                   </Button>
