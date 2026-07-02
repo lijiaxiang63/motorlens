@@ -105,7 +105,7 @@ describe('batch export ZIP', () => {
     expect(csv).toContain(videoName)
 
     // Report JSONs round-trip through the importer.
-    const jsonName = names.find((n) => n.endsWith('.json'))!
+    const jsonName = names.find((n) => n.endsWith('.json') && n !== 'manifest.json')!
     const parsed = parseSessionJson(strFromU8(files[jsonName]!))
     expect(parsed.subject?.code).toBe('P001')
   })
@@ -135,7 +135,7 @@ describe('batch export ZIP', () => {
     )
     const files = unzipSync(new Uint8Array(await blob.arrayBuffer()))
     const jsons = Object.keys(files)
-      .filter((n) => n.endsWith('.json'))
+      .filter((n) => n.endsWith('.json') && n !== 'manifest.json')
       .sort()
     expect(jsons).toHaveLength(2)
     expect(jsons[1]).toMatch(/_2\.json$/)
@@ -145,5 +145,41 @@ describe('batch export ZIP', () => {
     expect(slug('Maria García')).toBe('maria-garcía')
     expect(slug('  ++  ')).toBe('x')
     expect(slug('P-001')).toBe('p-001')
+  })
+
+  it('writes a manifest.json for backup re-import', async () => {
+    const s1 = makeSubject('P001', 'Maria García')
+    const s2 = makeSubject('P002', '')
+    const r1 = makeResult(s1, '2026-07-02T10:15:02.000Z', 'live_a')
+    const r2 = makeResult(s1, '2026-07-02T10:20:02.000Z')
+    const r3 = makeResult(s2, '2026-07-02T11:00:00.000Z')
+    const blob = await buildBatchExport(
+      [
+        { subject: s1, results: [r1, r2] },
+        { subject: s2, results: [r3] },
+      ],
+      videoStore({ live_a: { mimeType: 'video/webm' } }),
+    )
+    const files = unzipSync(new Uint8Array(await blob.arrayBuffer()))
+    expect(Object.keys(files)).toContain('manifest.json')
+
+    const manifest = JSON.parse(strFromU8(files['manifest.json']!))
+    expect(manifest.schemaVersion).toBe(1)
+    expect(manifest.app.name).toBe('MotorLens')
+    expect(manifest.subjects.map((s: Subject) => s.code).sort()).toEqual(['P001', 'P002'])
+    expect(manifest.results).toHaveLength(3)
+
+    // Every manifest path (report and video) resolves to a real zip entry.
+    for (const entry of manifest.results) {
+      expect(files[entry.path]).toBeDefined()
+      if (entry.videoPath) expect(files[entry.videoPath]).toBeDefined()
+    }
+
+    const r1Entry = manifest.results.find((e: { id: string }) => e.id === r1.id)
+    expect(r1Entry.subjectCode).toBe('P001')
+    expect(r1Entry.videoKey).toBe('live_a')
+    expect(r1Entry.mimeType).toBe('video/webm')
+    const r2Entry = manifest.results.find((e: { id: string }) => e.id === r2.id)
+    expect(r2Entry.videoKey).toBeUndefined()
   })
 })

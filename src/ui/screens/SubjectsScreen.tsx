@@ -1,12 +1,17 @@
-// Subjects list: registration form, per-subject summary rows, batch export.
+// Subjects list: registration form, per-subject summary rows, batch export
+// and backup-ZIP import (the browser→desktop data bridge).
 
-import { Archive, Plus, UserPlus } from 'lucide-react'
+import { Archive, ArchiveRestore, Plus, UserPlus } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { toast } from 'sonner'
+import { planImport } from '../../report/backup'
 import { buildBatchExport, downloadBatchExport } from '../../report/batch'
+import { applyImportPlan, snapshotExistingState } from '../../store/backup'
 import {
   getVideo,
   listAllResults,
   listSubjects,
+  newId,
   saveSubject,
   type StoredResult,
   type Subject,
@@ -26,6 +31,8 @@ export function SubjectsScreen() {
   const [error, setError] = useState<string | null>(null)
   const [showForm, setShowForm] = useState(false)
   const [exporting, setExporting] = useState<string | null>(null)
+  const [importing, setImporting] = useState<string | null>(null)
+  const importRef = useRef<HTMLInputElement>(null)
   const alive = useRef(true)
   useEffect(() => {
     alive.current = true
@@ -79,6 +86,30 @@ export function SubjectsScreen() {
     }
   }
 
+  async function importBackup(file: File) {
+    setImporting('Reading backup…')
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer())
+      const existing = await snapshotExistingState()
+      const plan = planImport(bytes, existing, newId)
+      const outcome = await applyImportPlan(plan, (done, total) => {
+        if (alive.current) setImporting(`Importing… ${done}/${total}`)
+      })
+      const skippedTotal = outcome.skipped.subjects + outcome.skipped.results + outcome.skipped.videos
+      toast.success(
+        `Imported ${outcome.subjectsAdded} subject${outcome.subjectsAdded === 1 ? '' : 's'}, ` +
+          `${outcome.resultsAdded} result${outcome.resultsAdded === 1 ? '' : 's'}, ` +
+          `${outcome.videosAdded} video${outcome.videosAdded === 1 ? '' : 's'}` +
+          (skippedTotal > 0 ? ` (${skippedTotal} already present, skipped)` : ''),
+      )
+      await load()
+    } catch (err) {
+      toast.error('Import failed', { description: err instanceof Error ? err.message : String(err) })
+    } finally {
+      if (alive.current) setImporting(null)
+    }
+  }
+
   const bySubject = new Map<string, StoredResult[]>()
   for (const r of results) {
     const arr = bySubject.get(r.subjectId) ?? []
@@ -101,12 +132,30 @@ export function SubjectsScreen() {
               </StatusChip>
             )}
             <Button
+              variant="ghost"
+              disabled={importing !== null}
+              onClick={() => importRef.current?.click()}
+            >
+              <ArchiveRestore /> {importing ?? 'Import backup…'}
+            </Button>
+            <Button
               variant="primary"
               disabled={results.length === 0 || exporting !== null}
               onClick={() => void exportAll()}
             >
               <Archive /> {exporting ?? 'Export all (ZIP)'}
             </Button>
+            <input
+              ref={importRef}
+              type="file"
+              accept=".zip,application/zip"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0]
+                e.target.value = ''
+                if (file) void importBackup(file)
+              }}
+            />
           </>
         }
       />

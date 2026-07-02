@@ -6,8 +6,10 @@
 // videos would need the streaming Zip class + File System Access API.
 
 import { strToU8, zipSync, type Zippable } from 'fflate'
+import { APP_VERSION } from '../config'
 import { savePlatformFile } from '../platform'
 import type { StoredResult, StoredVideo, Subject } from '../store/subjects'
+import type { BackupManifest } from './backup'
 import { buildSummaryCsv, buildSummaryRow } from './csv'
 import { reportFileName, stamp } from './export'
 
@@ -56,6 +58,7 @@ export async function buildBatchExport(
 ): Promise<Blob> {
   const tree: Zippable = {}
   const rows: string[][] = []
+  const manifestResults: BackupManifest['results'] = []
   const usedFolders = new Set<string>()
   const total = entries.reduce((n, e) => n + e.results.length, 0)
   let done = 0
@@ -65,18 +68,23 @@ export async function buildBatchExport(
     const folder = dedupe(base, usedFolders)
     const usedNames = new Set<string>()
     // Uploaded source files are shared by several segment results — write
-    // each video once per key and point every row at the same ZIP path.
+    // each video once per key and point every row (and manifest entry) at
+    // the same ZIP path.
     const videoPathByKey = new Map<string, string>()
+    const videoMetaByKey = new Map<string, { mimeType: string; fileName?: string }>()
 
     for (const result of results.slice().sort((a, b) => a.startedAt.localeCompare(b.startedAt))) {
       const jsonName = dedupe(reportFileName(result.report), usedNames)
-      tree[`${folder}/${jsonName}`] = [strToU8(JSON.stringify(result.report)), { level: 6 }]
+      const jsonPath = `${folder}/${jsonName}`
+      tree[jsonPath] = [strToU8(JSON.stringify(result.report)), { level: 6 }]
 
       let videoPath = ''
+      let videoMeta: { mimeType: string; fileName?: string } | undefined
       if (result.videoKey) {
-        const existing = videoPathByKey.get(result.videoKey)
-        if (existing !== undefined) {
-          videoPath = existing
+        const existingPath = videoPathByKey.get(result.videoKey)
+        if (existingPath !== undefined) {
+          videoPath = existingPath
+          videoMeta = videoMetaByKey.get(result.videoKey)
         } else {
           const video = await getVideo(result.videoKey)
           if (video) {
@@ -88,18 +96,37 @@ export async function buildBatchExport(
             // Already-compressed media: store, don't deflate.
             tree[`${folder}/${videoName}`] = [new Uint8Array(await video.blob.arrayBuffer()), { level: 0 }]
             videoPath = `${folder}/${videoName}`
+            videoMeta = { mimeType: video.mimeType, ...(video.fileName ? { fileName: video.fileName } : {}) }
           }
           videoPathByKey.set(result.videoKey, videoPath)
+          if (videoMeta) videoMetaByKey.set(result.videoKey, videoMeta)
         }
       }
 
-      rows.push(buildSummaryRow(subject, result, videoPath, `${folder}/${jsonName}`))
+      rows.push(buildSummaryRow(subject, result, videoPath, jsonPath))
+      manifestResults.push({
+        id: result.id,
+        subjectCode: subject.code,
+        path: jsonPath,
+        ...(result.videoKey ? { videoKey: result.videoKey } : {}),
+        ...(videoPath ? { videoPath } : {}),
+        ...(videoMeta?.mimeType ? { mimeType: videoMeta.mimeType } : {}),
+        ...(videoMeta?.fileName ? { fileName: videoMeta.fileName } : {}),
+      })
       done++
       onProgress?.(done, total)
     }
   }
 
   tree['summary.csv'] = [strToU8(buildSummaryCsv(rows)), { level: 6 }]
+  const manifest: BackupManifest = {
+    schemaVersion: 1,
+    app: { name: 'MotorLens', version: APP_VERSION },
+    exportedAt: new Date().toISOString(),
+    subjects: entries.map((e) => e.subject),
+    results: manifestResults,
+  }
+  tree['manifest.json'] = [strToU8(JSON.stringify(manifest)), { level: 6 }]
   const zipped = zipSync(tree)
   return new Blob([zipped as BlobPart], { type: 'application/zip' })
 }
