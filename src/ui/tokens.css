@@ -13,7 +13,15 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
-:root {
+/* .report-light: the clinical report route forces the light palette
+ * regardless of the app's current theme (charts print with fixed light
+ * colors; @media print can't recolor an already-painted canvas). Declaring
+ * the vars again on this class — rather than just relying on :root's
+ * values — means the report wrapper renders light even when nested inside
+ * a dark-themed app (the `.dark` class lives on <html>, an ancestor; a
+ * custom property set on this class wins over one inherited from .dark). */
+:root,
+.report-light {
   /* surfaces & ink — light: the primary clinical theme */
   --background: #f6f7f9;
   --surface: #ffffff;

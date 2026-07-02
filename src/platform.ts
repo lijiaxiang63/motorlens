@@ -45,6 +45,16 @@ export interface MotorlensBridge {
   updateInstall?(): Promise<void>
   updateOpenRelease?(): Promise<void>
   onUpdateEvent?(cb: (status: UpdateStatus) => void): () => void
+  /** Phase 3e: renders the given report route in a hidden window and saves
+   *  the resulting PDF (native dialog, or MOTORLENS_PDF_OUT for e2e). */
+  exportPdf?(req: {
+    kind: 'session' | 'subject'
+    id: string
+    defaultName: string
+  }): Promise<{ saved: boolean; path?: string; error?: string }>
+  /** Sent by the report route once its document (incl. any chart images)
+   *  has finished rendering — the hidden window's printToPDF waits for this. */
+  reportReady?(): void
 }
 
 declare global {

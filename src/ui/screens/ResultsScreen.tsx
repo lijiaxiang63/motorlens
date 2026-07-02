@@ -292,6 +292,14 @@ export function ResultsScreen({ result: r }: { result: ResultProps }) {
             <Button variant="ghost" onClick={() => window.print()}>
               Print
             </Button>
+            {resultId && (
+              <Button
+                variant="ghost"
+                onClick={() => navigate({ name: 'report', kind: 'session', resultId })}
+              >
+                Report (PDF)
+              </Button>
+            )}
             <Button variant="ghost" onClick={() => void repeatTest()}>
               Repeat test
             </Button>

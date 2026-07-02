@@ -7,6 +7,7 @@ import { Toaster } from 'sonner'
 import { CompareScreen } from './screens/CompareScreen'
 import { HomeScreen } from './screens/HomeScreen'
 import { RecordScreen } from './screens/RecordScreen'
+import { ReportScreen } from './screens/ReportScreen'
 import { ResultsScreen } from './screens/ResultsScreen'
 import { MonitorScreen } from './screens/MonitorScreen'
 import { SettingsScreen } from './screens/SettingsScreen'
@@ -48,6 +49,8 @@ function ScreenView({ req }: { req: ScreenRequest }) {
       )
     case 'compare':
       return <CompareScreen subjectId={req.subjectId} aId={req.aId} bId={req.bId} />
+    case 'report':
+      return <ReportScreen kind={req.kind} id={req.kind === 'session' ? req.resultId : req.subjectId} />
   }
 }
 

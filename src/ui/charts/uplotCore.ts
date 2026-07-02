@@ -27,9 +27,11 @@ export interface ChartPalette {
 }
 
 /** Read the current theme's chart tokens (call at chart creation; charts are
- *  recreated on theme switch so the values stay in sync). */
-export function readChartPalette(): ChartPalette {
-  const s = getComputedStyle(document.documentElement)
+ *  recreated on theme switch so the values stay in sync). Accepts an element
+ *  to read from — the clinical report route reads from its `.report-light`
+ *  wrapper so PDF/print charts stay light-locked regardless of app theme. */
+export function readChartPalette(el: Element = document.documentElement): ChartPalette {
+  const s = getComputedStyle(el)
   const v = (name: string, fallback: string) => s.getPropertyValue(name).trim() || fallback
   return {
     line: v('--chart-line', '#3987e5'),

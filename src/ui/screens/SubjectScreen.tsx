@@ -130,6 +130,12 @@ export function SubjectScreen({ subjectId, notice }: { subjectId: string; notice
             <Button variant="ghost" onClick={() => navigate({ name: 'subjects' })}>
               ← Subjects
             </Button>
+            <Button
+              variant="ghost"
+              onClick={() => navigate({ name: 'report', kind: 'subject', subjectId: s.id })}
+            >
+              Report (PDF)
+            </Button>
             <Button variant="ghost" onClick={() => setEditing((v) => !v)}>
               <Pencil /> Edit
             </Button>
@@ -338,6 +344,15 @@ export function SubjectScreen({ subjectId, notice }: { subjectId: string; notice
                   >
                     View
                   </Button>
+                  {comparable && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => navigate({ name: 'report', kind: 'session', resultId: r.id })}
+                    >
+                      Report
+                    </Button>
+                  )}
                   <Button variant="ghost-danger" size="sm" onClick={() => setConfirmDeleteResult(r)}>
                     Delete
                   </Button>

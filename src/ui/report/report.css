@@ -1,0 +1,14 @@
+/* Clinical report print layout. @page can't be scoped to a route — it also
+ * (harmlessly, arguably usefully) applies to ResultsScreen's legacy Print
+ * button. preferCSSPageSize:true on the Electron printToPDF call and a plain
+ * browser print both read this same margin/size source, so the two paths
+ * paginate identically. */
+@page {
+  size: A4;
+  margin: 14mm 14mm 16mm;
+}
+
+.report-light {
+  font-size: 13px;
+  line-height: 1.5;
+}
