@@ -4,6 +4,7 @@
 // up by effect teardown).
 
 import { Toaster } from 'sonner'
+import { CompareScreen } from './screens/CompareScreen'
 import { HomeScreen } from './screens/HomeScreen'
 import { RecordScreen } from './screens/RecordScreen'
 import { ResultsScreen } from './screens/ResultsScreen'
@@ -45,6 +46,8 @@ function ScreenView({ req }: { req: ScreenRequest }) {
           hand={req.hand}
         />
       )
+    case 'compare':
+      return <CompareScreen subjectId={req.subjectId} aId={req.aId} bId={req.bId} />
   }
 }
 

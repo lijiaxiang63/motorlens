@@ -137,9 +137,123 @@ try {
     await page.waitFor(`document.body.textContent.includes('Export JSON')`, { timeout: 10_000 })
   }
 
+  // --- back to the hub, then reload with a decrement preset for a 3rd right-hand run ---
+  await page.clickButton('Next test →')
+  await page.waitFor(`document.body.textContent.includes('Test battery')`)
+  await page.goto(`${base}/?source=synthetic&preset=tap-decrement&speed=4`)
+  await page.waitFor('!!window.__ctx')
+  await page.clickButton('Open subjects')
+  await page.waitFor(`document.body.textContent.includes(${JSON.stringify(code)})`, { timeout: 15_000 })
+  const opened = await page.eval(`(() => {
+    const rows = [...document.querySelectorAll('div')].filter((d) => d.textContent.includes(${JSON.stringify(code)}))
+    let node = rows[rows.length - 1]
+    while (node) {
+      const btn = [...node.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Open')
+      if (btn) { btn.click(); return true }
+      node = node.parentElement
+    }
+    return false
+  })()`)
+  if (!opened) fail(`could not find/open subject ${code} after reload`)
+  await page.waitFor(`document.body.textContent.includes('Test battery')`)
+  await page.eval('window.__lastReport = null')
+  const redone = await page.eval(`(() => {
+    const divs = [...document.querySelectorAll('div')].filter((d) =>
+      d.textContent.includes('Finger Tapping Test — Right hand'),
+    )
+    let node = divs[divs.length - 1]
+    while (node) {
+      const btn = [...node.querySelectorAll('button')].find((b) => b.textContent.trim() === 'Redo')
+      if (btn) { btn.click(); return true }
+      node = node.parentElement
+    }
+    return false
+  })()`)
+  if (!redone) fail('right-hand tap Redo button not found after reload')
+  await page.waitFor('!!window.__lastReport', { timeout: 120_000, interval: 250 })
+  await page.waitFor(`document.body.textContent.includes('Saved to ${code}')`, { timeout: 15_000 })
+  await page.clickButton('Next test →')
+  await page.waitFor(`document.body.textContent.includes('Test battery')`)
+
+  // --- select two right-hand tap results (2hz run + the new decrement run) and compare ---
+  const checkboxCount = await page.eval(
+    `document.querySelectorAll('[data-testid="compare-checkbox"]').length`,
+  )
+  if (checkboxCount < 2) fail(`expected >=2 comparable result checkboxes, got ${checkboxCount}`)
+  await page.eval(`(() => {
+    const boxes = [...document.querySelectorAll('[data-testid="compare-checkbox"]')]
+    boxes[0].click()
+    boxes[1].click()
+  })()`)
+  await page.waitFor(
+    `[...document.querySelectorAll('button')].some(b => b.textContent.trim() === 'Compare selected')`,
+  )
+  await page.clickButton('Compare selected')
+  await page.waitFor(`document.body.textContent.includes('Compare results')`, { timeout: 10_000 })
+
+  const decrementRow = await page.eval(`(() => {
+    const labelSpan = [...document.querySelectorAll('span')].find(
+      (s) => s.textContent.trim() === 'Amplitude decrement',
+    )
+    if (!labelSpan) return null
+    return [...labelSpan.parentElement.children].map((c) => c.textContent.trim())
+  })()`)
+  if (!decrementRow) {
+    fail('Amplitude decrement row not found in the compare table')
+  } else {
+    const nums = [decrementRow[1], decrementRow[2]].map((t) => parseFloat(t))
+    const hasLow = nums.some((n) => Math.abs(n) < 10)
+    const hasHigh = nums.some((n) => n > 20 && n < 40)
+    if (!hasLow || !hasHigh) fail(`decrement row values unexpected: [${decrementRow.join(', ')}]`)
+  }
+  const canvasCount = await page.eval(`document.querySelectorAll('canvas').length`)
+  if (canvasCount < 2) fail(`expected >=2 overlay canvases on the compare screen, got ${canvasCount}`)
+
+  // --- deleting a compared result navigates back gracefully (never a crash) ---
+  await page.clickButton(`← ${code}`)
+  await page.waitFor(`document.body.textContent.includes('Test battery')`)
+  const ids = await page.eval(`new Promise((resolve, reject) => {
+    const req = indexedDB.open('motorlens')
+    req.onsuccess = () => {
+      const db = req.result
+      const tx = db.transaction(['subjects', 'results'], 'readonly')
+      const out = {}
+      tx.objectStore('subjects').getAll().onsuccess = (e) => {
+        out.subjectId = e.target.result.find((s) => s.code === ${JSON.stringify(code)})?.id
+      }
+      tx.objectStore('results').getAll().onsuccess = (e) => {
+        const rows = e.target.result.filter((r) => r.testId === 'finger_tap' && r.hand === 'right')
+        out.ids = rows.map((r) => r.id)
+      }
+      tx.oncomplete = () => { db.close(); resolve(out) }
+    }
+  })`)
+  if (!ids.subjectId || (ids.ids ?? []).length < 2) {
+    fail('could not resolve subject/result ids for the delete-then-compare check')
+  } else {
+    const [aId, bId] = ids.ids
+    await page.eval(`new Promise((resolve, reject) => {
+      const req = indexedDB.open('motorlens')
+      req.onsuccess = () => {
+        const db = req.result
+        const tx = db.transaction(['results'], 'readwrite')
+        tx.objectStore('results').delete(${JSON.stringify(aId)})
+        tx.oncomplete = () => { db.close(); resolve(true) }
+      }
+    })`)
+    await page.eval(
+      `window.__ctx.navigate({ name: 'compare', subjectId: ${JSON.stringify(ids.subjectId)}, aId: ${JSON.stringify(aId)}, bId: ${JSON.stringify(bId)} })`,
+    )
+    await page.waitFor(`document.body.textContent.includes('Test battery')`, { timeout: 10_000 })
+    const noticeShown = await page.eval(
+      `document.body.textContent.includes('A compared result was deleted')`,
+    )
+    if (!noticeShown) fail('expected a notice after navigating to a compare route with a deleted result')
+  }
+
   console.log(
     `analytics-flow OK: subject=${code} __lastReport keys unchanged, asymmetry card paired, ` +
-      `trend click-through works`,
+      `trend click-through works, compare table + overlays render, deleted-result compare bounces back gracefully`,
   )
 } catch (err) {
   fail(err.message)

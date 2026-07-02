@@ -10,6 +10,8 @@ import { cn } from '../lib/cn'
 import { useTheme } from '../theme'
 import {
   createEventChart,
+  createOverlayEventChart,
+  createOverlaySignalChart,
   createSignalChart,
   createStreamChart,
   createTrendChart,
@@ -130,5 +132,52 @@ export function TrendChart({
     const c = createTrendChart(host.current!, chartPoints, chartLine, yLabel, { height })
     return () => c.destroy()
   }, [resolved, points, line, yLabel, height])
+  return <div ref={host} className={cn(panelClass, className)} />
+}
+
+/** Two recordings' signals overlaid, t=0-rebased (a = left/orange, b =
+ *  right/blue — the fixed bilateral convention). */
+export function OverlaySignalChart({
+  a,
+  b,
+  yLabel,
+  height,
+  className,
+}: {
+  a: Series
+  b: Series
+  yLabel: string
+  height?: number
+  className?: string
+}) {
+  const host = useRef<HTMLDivElement>(null)
+  const { resolved } = useTheme()
+  useEffect(() => {
+    const c = createOverlaySignalChart(host.current!, a, b, yLabel, { height })
+    return () => c.destroy()
+  }, [resolved, a, b, yLabel, height])
+  return <div ref={host} className={cn(panelClass, className)} />
+}
+
+/** Two recordings' per-event values overlaid by event index. */
+export function OverlayEventChart({
+  a,
+  b,
+  yLabel,
+  height,
+  className,
+}: {
+  a: number[]
+  b: number[]
+  yLabel: string
+  height?: number
+  className?: string
+}) {
+  const host = useRef<HTMLDivElement>(null)
+  const { resolved } = useTheme()
+  useEffect(() => {
+    const c = createOverlayEventChart(host.current!, a, b, yLabel, { height })
+    return () => c.destroy()
+  }, [resolved, a, b, yLabel, height])
   return <div ref={host} className={cn(panelClass, className)} />
 }

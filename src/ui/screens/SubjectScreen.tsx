@@ -63,6 +63,7 @@ export function SubjectScreen({ subjectId, notice }: { subjectId: string; notice
   const [noticeShown, setNoticeShown] = useState(notice != null)
   const [confirmDeleteSubject, setConfirmDeleteSubject] = useState(false)
   const [confirmDeleteResult, setConfirmDeleteResult] = useState<StoredResult | null>(null)
+  const [selectedForCompare, setSelectedForCompare] = useState<Set<string>>(new Set())
   const uploadRef = useRef<HTMLInputElement>(null)
   const alive = useRef(true)
   useEffect(() => {
@@ -252,9 +253,28 @@ export function SubjectScreen({ subjectId, notice }: { subjectId: string; notice
       <AsymmetryCard results={results} subject={s} />
       <TrendGrid results={results} subjectId={s.id} />
 
-      <h3 className="mb-2 mt-5 text-sm font-semibold uppercase tracking-[0.8px] text-muted-foreground">
-        Results{results.length > 0 ? ` (${results.length})` : ''}
-      </h3>
+      <div className="mb-2 mt-5 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="text-sm font-semibold uppercase tracking-[0.8px] text-muted-foreground">
+          Results{results.length > 0 ? ` (${results.length})` : ''}
+        </h3>
+        {selectedForCompare.size === 2 && (
+          <Button
+            variant="primary"
+            size="sm"
+            onClick={() => {
+              const [idA, idB] = [...selectedForCompare]
+              const rA = results.find((r) => r.id === idA)
+              const rB = results.find((r) => r.id === idB)
+              if (!rA || !rB) return
+              const [older, newer] = rA.startedAt <= rB.startedAt ? [rA, rB] : [rB, rA]
+              setSelectedForCompare(new Set())
+              navigate({ name: 'compare', subjectId: s.id, aId: older.id, bId: newer.id })
+            }}
+          >
+            Compare selected
+          </Button>
+        )}
+      </div>
       {results.length === 0 ? (
         <Card className="flex flex-col items-center gap-3 py-10 text-center">
           <div className="flex size-11 items-center justify-center rounded-full bg-accent/10 text-accent">
@@ -268,11 +288,30 @@ export function SubjectScreen({ subjectId, notice }: { subjectId: string; notice
         <div className="flex flex-col gap-2.5">
           {results.map((r) => {
             const def = testDefById(r.testId)
+            const comparable = cycleMetrics(r) !== null
+            const isSelected = selectedForCompare.has(r.id)
             return (
               <div
                 key={r.id}
                 className="flex flex-wrap items-center gap-3 rounded-xl border bg-surface px-4 py-3"
               >
+                {comparable && (
+                  <input
+                    type="checkbox"
+                    data-testid="compare-checkbox"
+                    checked={isSelected}
+                    disabled={!isSelected && selectedForCompare.size >= 2}
+                    onChange={() =>
+                      setSelectedForCompare((prev) => {
+                        const next = new Set(prev)
+                        if (next.has(r.id)) next.delete(r.id)
+                        else if (next.size < 2) next.add(r.id)
+                        return next
+                      })
+                    }
+                    aria-label="Select for comparison"
+                  />
+                )}
                 <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2.5">
                   <span
                     className={

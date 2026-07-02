@@ -34,6 +34,7 @@ function sectionOf(name: ScreenRequest['name']): ScreenRequest['name'] {
     case 'subject':
     case 'videoReview':
     case 'trend':
+    case 'compare':
       return 'subjects'
     case 'record':
     case 'results':
@@ -53,6 +54,7 @@ const SCREEN_TITLES: Record<ScreenRequest['name'], string> = {
   monitor: 'Joint Monitor',
   settings: 'Settings',
   trend: 'Trend',
+  compare: 'Compare',
 }
 
 // Static for the process lifetime (window.motorlens is assigned by preload

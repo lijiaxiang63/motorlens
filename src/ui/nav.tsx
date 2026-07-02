@@ -54,6 +54,7 @@ export type ScreenRequest =
   | { name: 'monitor' }
   | { name: 'settings' }
   | { name: 'trend'; subjectId: string; testId: TestId; metricKey: MetricKey; hand?: Hand }
+  | { name: 'compare'; subjectId: string; aId: string; bId: string }
 
 /** Legacy screen-factory contract (kept while vanilla screens are wrapped). */
 export interface ScreenInstance {

@@ -20,6 +20,10 @@ export interface ChartPalette {
   trend: string
   axis: string
   grid: string
+  /** Fixed bilateral convention (Phase 2+): left = orange, right = blue.
+   *  Doubles as the "A vs B" pair in result comparison. */
+  left: string
+  right: string
 }
 
 /** Read the current theme's chart tokens (call at chart creation; charts are
@@ -33,6 +37,8 @@ export function readChartPalette(): ChartPalette {
     trend: v('--chart-trend', '#c98500'),
     axis: v('--chart-axis', '#8b93a7'),
     grid: v('--chart-grid', 'rgba(139, 147, 167, 0.14)'),
+    left: v('--chart-left', '#d95926'),
+    right: v('--chart-right', '#3987e5'),
   }
 }
 
@@ -222,6 +228,100 @@ export function createEventChart(
     }
   }
   const u = new uPlot(o, data, mount)
+  const unobserve = observeSize(el, mount, u, height)
+  return {
+    destroy() {
+      unobserve()
+      u.destroy()
+      mount.remove()
+    },
+  }
+}
+
+function medianDt(t: number[]): number {
+  if (t.length < 2) return 33
+  const deltas: number[] = []
+  for (let i = 1; i < t.length; i++) deltas.push(t[i]! - t[i - 1]!)
+  deltas.sort((x, y) => x - y)
+  return deltas[Math.floor(deltas.length / 2)] || 33
+}
+
+/** Nearest-sample lookup onto a shared uniform grid — two independent
+ *  recordings rarely share exact frame timestamps, so overlaying them
+ *  requires a common x axis; nearest-neighbor (rather than interpolating)
+ *  keeps each series' own values exact. A grid point farther than
+ *  MAX_GAP_MS from the nearest real sample reports null (a genuine gap,
+ *  not just an off-grid timestamp). */
+function resampleOnGrid(series: Series, grid: number[]): (number | null)[] {
+  if (series.t.length === 0) return grid.map(() => null)
+  let i = 0
+  return grid.map((g) => {
+    while (i < series.t.length - 1 && Math.abs(series.t[i + 1]! - g) <= Math.abs(series.t[i]! - g)) i++
+    return Math.abs(series.t[i]! - g) > MAX_GAP_MS ? null : series.v[i]!
+  })
+}
+
+/** Two recordings' signals overlaid on a shared, t=0-rebased time axis
+ *  (left = orange = `a`, right = blue = `b` — the fixed bilateral
+ *  convention, reused here for "A vs B" identity). */
+export function createOverlaySignalChart(
+  el: HTMLElement,
+  a: Series,
+  b: Series,
+  yLabel: string,
+  opts: { height?: number; palette?: ChartPalette } = {},
+): StaticChartCore {
+  const c = opts.palette ?? readChartPalette()
+  const height = opts.height ?? 220
+  const dt = Math.max(8, Math.min(medianDt(a.t), medianDt(b.t)))
+  const end = Math.max(a.t[a.t.length - 1] ?? 0, b.t[b.t.length - 1] ?? 0)
+  const grid: number[] = [0]
+  for (let t = dt; t <= end; t += dt) grid.push(t)
+  const ys1 = resampleOnGrid(a, grid)
+  const ys2 = resampleOnGrid(b, grid)
+  const xs = grid.map((t) => t / 1000)
+
+  const mount = makeMount(el)
+  const o = baseOpts(c, mount.clientWidth || 600, height)
+  o.axes = [axis(c, 'time (s)'), axis(c, yLabel)]
+  o.series.push(
+    { stroke: c.left, width: 2, points: { show: false }, spanGaps: false },
+    { stroke: c.right, width: 2, points: { show: false }, spanGaps: false },
+  )
+  const u = new uPlot(o, [xs, ys1 as never, ys2 as never], mount)
+  const unobserve = observeSize(el, mount, u, height)
+  return {
+    destroy() {
+      unobserve()
+      u.destroy()
+      mount.remove()
+    },
+  }
+}
+
+/** Two recordings' per-event values (e.g. closing amplitude) overlaid by
+ *  event index; the shorter series pads with null past its own event count. */
+export function createOverlayEventChart(
+  el: HTMLElement,
+  a: number[],
+  b: number[],
+  yLabel: string,
+  opts: { height?: number; palette?: ChartPalette } = {},
+): StaticChartCore {
+  const c = opts.palette ?? readChartPalette()
+  const height = opts.height ?? 200
+  const n = Math.max(a.length, b.length)
+  const xs = Array.from({ length: n }, (_, i) => i + 1)
+  const ys1: (number | null)[] = xs.map((_, i) => (i < a.length ? a[i]! : null))
+  const ys2: (number | null)[] = xs.map((_, i) => (i < b.length ? b[i]! : null))
+  const mount = makeMount(el)
+  const o = baseOpts(c, mount.clientWidth || 600, height)
+  o.axes = [axis(c, 'event #'), axis(c, yLabel)]
+  o.series.push(
+    { stroke: c.left, width: 1, dash: [4, 4], points: { show: true, size: 6, fill: c.left } },
+    { stroke: c.right, width: 1, dash: [4, 4], points: { show: true, size: 6, fill: c.right } },
+  )
+  const u = new uPlot(o, [xs, ys1 as never, ys2 as never], mount)
   const unobserve = observeSize(el, mount, u, height)
   return {
     destroy() {
