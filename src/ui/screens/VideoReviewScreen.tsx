@@ -32,6 +32,7 @@ import { Button } from '../components/ui/button'
 import { Card, CardTitle } from '../components/ui/card'
 import { CheckboxRow, Field, Input, Select } from '../components/ui/field'
 import { ConfirmDialog } from '../components/ui/alert-dialog'
+import { PageHeader } from '../components/PageHeader'
 import { fmtTime } from '../format'
 import { useNav } from '../nav'
 import {
@@ -227,27 +228,27 @@ export function VideoReviewScreen({ subject, file }: { subject: Subject; file: F
   const sel = segments[selected]
 
   const header = (
-    <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
-      <div>
-        <h2 className="text-[20px] font-semibold tracking-tight">
-          Video analysis — {subject.code}
-        </h2>
-        <p className="mt-0.5 text-[13px] text-muted-foreground">
+    <PageHeader
+      title={`Video analysis — ${subject.code}`}
+      description={
+        <>
           {file.name}
           {stage.kind === 'review' &&
             ` · ${fmtTime(durationMs)} · ${segments.length} segment${segments.length === 1 ? '' : 's'} auto-detected`}
-        </p>
-      </div>
-      <Button
-        variant="ghost"
-        onClick={() => {
-          if (stage.kind !== 'review' || segments.length === 0) backToSubject()
-          else setConfirmBack(true)
-        }}
-      >
-        ← Subject
-      </Button>
-    </header>
+        </>
+      }
+      actions={
+        <Button
+          variant="ghost"
+          onClick={() => {
+            if (stage.kind !== 'review' || segments.length === 0) backToSubject()
+            else setConfirmBack(true)
+          }}
+        >
+          ← Subject
+        </Button>
+      }
+    />
   )
 
   return (

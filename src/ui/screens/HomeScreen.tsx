@@ -9,6 +9,7 @@ import { TEST_DEFS } from '../../protocol/definitions'
 import type { Hand, LandmarkFrame } from '../../types'
 import { Button } from '../components/ui/button'
 import { Card, CardDescription, CardFooter, CardTitle } from '../components/ui/card'
+import { PageHeader } from '../components/PageHeader'
 import { StatusChip } from '../components/StatusChip'
 import { useFrameSubscription, useSourceStatus } from '../hooks/useFrameSubscription'
 import { useInterval } from '../hooks/useInterval'
@@ -57,27 +58,25 @@ export function HomeScreen() {
 
   return (
     <div className="mx-auto max-w-[1100px] px-6 pb-12 pt-6">
-      <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tight">Quick Test</h1>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">
-            Run a single assessment without registering a subject — results are not saved.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <StatusChip
-            state={status.state === 'ready' ? 'ok' : status.state === 'error' ? 'err' : 'idle'}
-          >
-            {sourceLabel}
-          </StatusChip>
-          <StatusChip state={detected ? 'ok' : 'idle'}>
-            {detected ? `${detected} hand detected` : 'no hand detected'}
-          </StatusChip>
-          <StatusChip state={fps >= 15 ? 'ok' : fps > 0 ? 'warn' : 'idle'}>
-            <span className="tabular-nums">{fps.toFixed(0)} fps</span>
-          </StatusChip>
-        </div>
-      </header>
+      <PageHeader
+        title="Quick Test"
+        description="Run a single assessment without registering a subject — results are not saved."
+        actions={
+          <>
+            <StatusChip
+              state={status.state === 'ready' ? 'ok' : status.state === 'error' ? 'err' : 'idle'}
+            >
+              {sourceLabel}
+            </StatusChip>
+            <StatusChip state={detected ? 'ok' : 'idle'}>
+              {detected ? `${detected} hand detected` : 'no hand detected'}
+            </StatusChip>
+            <StatusChip state={fps >= 15 ? 'ok' : fps > 0 ? 'warn' : 'idle'}>
+              <span className="tabular-nums">{fps.toFixed(0)} fps</span>
+            </StatusChip>
+          </>
+        }
+      />
 
       <div className="grid grid-cols-[1.25fr_1fr] items-start gap-5 min-w-0-children max-[900px]:grid-cols-1">
         <div>

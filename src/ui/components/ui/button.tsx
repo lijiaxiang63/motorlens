@@ -4,12 +4,12 @@ import type { ComponentProps } from 'react'
 import { cn } from '../../lib/cn'
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg text-[13.5px] font-medium cursor-pointer transition-colors duration-100 outline-none focus-visible:ring-2 focus-visible:ring-accent/50 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
+  'inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-lg text-[13.5px] font-medium cursor-pointer transition-[color,background-color,border-color,box-shadow,transform] duration-150 outline-none focus-visible:ring-2 focus-visible:ring-accent/50 active:scale-[0.98] disabled:pointer-events-none disabled:opacity-50 disabled:active:scale-100 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0',
   {
     variants: {
       variant: {
         primary:
-          'bg-accent text-accent-foreground font-semibold hover:brightness-110 active:brightness-95',
+          'bg-accent text-accent-foreground font-semibold shadow-sm hover:brightness-110 active:brightness-95 active:shadow-none',
         outline:
           'border bg-surface-2 text-foreground hover:border-accent',
         ghost:
@@ -17,7 +17,7 @@ const buttonVariants = cva(
         'ghost-danger':
           'text-danger hover:bg-danger-surface',
         danger:
-          'bg-danger text-white font-semibold hover:brightness-110',
+          'bg-danger text-white font-semibold shadow-sm hover:brightness-110 active:shadow-none',
       },
       size: {
         default: 'h-9 px-3.5',

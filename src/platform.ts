@@ -8,6 +8,28 @@ export interface FileFilter {
   extensions: string[]
 }
 
+// Mirrors electron/shared.ts's UpdateStatus — this file never imports that
+// module (it must stay usable from the browser build).
+export type UpdateState =
+  | 'idle'
+  | 'dev'
+  | 'checking'
+  | 'available'
+  | 'not-available'
+  | 'downloading'
+  | 'downloaded'
+  | 'error'
+
+export interface UpdateStatus {
+  state: UpdateState
+  currentVersion: string
+  version?: string
+  percent?: number
+  releaseUrl?: string
+  canInstall?: boolean
+  error?: string
+}
+
 export interface MotorlensBridge {
   appInfo(): Promise<{ version: string; platform: string }>
   saveFile(req: {
@@ -16,6 +38,13 @@ export interface MotorlensBridge {
     filters?: FileFilter[]
   }): Promise<{ saved: boolean; path?: string }>
   openFile(filters?: FileFilter[]): Promise<{ name: string; data: ArrayBuffer } | null>
+  /** Present from Phase 5 onward; optional so a stale preload can't crash the renderer. */
+  flags?: { vibrancy: boolean }
+  updateCheck?(): Promise<UpdateStatus>
+  updateDownload?(): Promise<void>
+  updateInstall?(): Promise<void>
+  updateOpenRelease?(): Promise<void>
+  onUpdateEvent?(cb: (status: UpdateStatus) => void): () => void
 }
 
 declare global {

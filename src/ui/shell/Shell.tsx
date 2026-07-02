@@ -53,14 +53,27 @@ const SCREEN_TITLES: Record<ScreenRequest['name'], string> = {
   settings: 'Settings',
 }
 
+// Static for the process lifetime (window.motorlens is assigned by preload
+// before this module evaluates) — computed once rather than per-render.
+// hiddenInset traffic lights land on the Sidebar's top-left, not the TopBar
+// (which starts 220px in) — this drives the Sidebar header's mac clearance
+// and drag region. Kept in sync with electron/main.ts's `trafficLightPosition`.
+const macDesktop = isDesktop() && navigator.platform.startsWith('Mac')
+
 function Sidebar() {
   const { screen, ctx, navigate } = useNav()
   const active = sectionOf(screen.name)
   const fileRef = useRef<HTMLInputElement>(null)
 
   return (
-    <aside className="flex w-[220px] shrink-0 flex-col border-r bg-surface">
-      <div className="flex items-center gap-2.5 px-4 pb-4 pt-5">
+    <aside className="app-sidebar flex w-[220px] shrink-0 flex-col border-r bg-surface">
+      <div
+        className={cn(
+          'flex items-center gap-2.5 px-4 pb-4',
+          macDesktop ? 'pt-[52px]' : 'pt-5',
+        )}
+        style={macDesktop ? ({ WebkitAppRegion: 'drag' } as React.CSSProperties) : undefined}
+      >
         <div className="flex size-8 items-center justify-center rounded-lg bg-accent/15 text-accent">
           <Hand className="size-[18px]" />
         </div>
@@ -77,12 +90,15 @@ function Sidebar() {
             type="button"
             onClick={() => navigate({ name } as ScreenRequest)}
             className={cn(
-              'flex h-9 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 text-[13.5px] transition-colors',
+              'relative flex h-9 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 text-[13.5px] outline-none transition-colors focus-visible:ring-2 focus-visible:ring-accent/50',
               active === name
                 ? 'bg-accent/12 font-medium text-accent'
                 : 'text-muted-foreground hover:bg-surface-2 hover:text-foreground',
             )}
           >
+            {active === name && (
+              <span className="absolute left-0 top-1/2 h-4 w-[3px] -translate-y-1/2 rounded-full bg-accent" />
+            )}
             <Icon className="size-4" />
             {label}
           </button>
@@ -90,7 +106,7 @@ function Sidebar() {
         <button
           type="button"
           onClick={() => fileRef.current?.click()}
-          className="flex h-9 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 text-[13.5px] text-muted-foreground transition-colors hover:bg-surface-2 hover:text-foreground"
+          className="flex h-9 cursor-pointer items-center gap-2.5 rounded-lg px-2.5 text-[13.5px] text-muted-foreground outline-none transition-colors hover:bg-surface-2 hover:text-foreground focus-visible:ring-2 focus-visible:ring-accent/50"
         >
           <FileUp className="size-4" />
           Import session…
@@ -121,15 +137,10 @@ function Sidebar() {
 function TopBar() {
   const { screen } = useNav()
   const { resolved, setPref } = useTheme()
-  // hiddenInset traffic lights need clearance when running as a Mac app.
-  const macDesktop = isDesktop() && navigator.platform.startsWith('Mac')
 
   return (
     <header
-      className={cn(
-        'flex h-12 shrink-0 items-center gap-3 border-b bg-surface px-4',
-        macDesktop && 'pl-20',
-      )}
+      className="flex h-12 shrink-0 items-center gap-3 border-b bg-surface px-4"
       style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
     >
       <div className="text-[13px] font-medium text-muted-foreground">
@@ -142,7 +153,11 @@ function TopBar() {
           aria-label="Toggle theme"
           onClick={() => setPref(resolved === 'dark' ? 'light' : 'dark')}
         >
-          {resolved === 'dark' ? <Sun /> : <Moon />}
+          {resolved === 'dark' ? (
+            <Sun className="animate-[ml-icon-in_150ms_ease]" />
+          ) : (
+            <Moon className="animate-[ml-icon-in_150ms_ease]" />
+          )}
         </Button>
       </div>
     </header>
@@ -150,19 +165,41 @@ function TopBar() {
 }
 
 export function Shell({ children }: { children: ReactNode }) {
-  const { navCount } = useNav()
+  const { navCount, screen } = useNav()
   const mainRef = useRef<HTMLElement>(null)
+  // StrictMode-safe one-shot guard (CLAUDE.md pattern): only the first
+  // 'available' push toasts — later pushes of the same state (or a second
+  // effect invocation in dev) don't re-toast.
+  const updateToastedRef = useRef(false)
 
   useEffect(() => {
     mainRef.current?.scrollTo(0, 0)
   }, [navCount])
 
+  // Native window-menu/Mission Control naming for free — no harness impact,
+  // nothing reads document.title.
+  useEffect(() => {
+    document.title = `${SCREEN_TITLES[screen.name]} — MotorLens`
+  }, [screen.name])
+
+  useEffect(() => {
+    const bridge = window.motorlens
+    if (!bridge?.onUpdateEvent) return
+    return bridge.onUpdateEvent((status) => {
+      if (status.state !== 'available' || updateToastedRef.current) return
+      updateToastedRef.current = true
+      toast.info(`Update ${status.version ?? ''} available`.trim(), {
+        description: 'See Settings to download.',
+      })
+    })
+  }, [])
+
   return (
-    <div className="flex h-full min-h-0 bg-background font-sans text-foreground">
+    <div className="app-root flex h-full min-h-0 bg-background font-sans text-foreground">
       <Sidebar />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="app-content flex min-w-0 flex-1 flex-col bg-background">
         <TopBar />
-        <main ref={mainRef} className="min-h-0 flex-1 overflow-y-auto">
+        <main ref={mainRef} className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
           {children}
         </main>
       </div>

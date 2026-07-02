@@ -22,6 +22,7 @@ import { LiveEma } from '../../signal/filters'
 import type { Hand } from '../../types'
 import { StreamChart, type StreamChartHandle } from '../charts/charts'
 import { Button } from '../components/ui/button'
+import { PageHeader } from '../components/PageHeader'
 import { useNav, type SubjectTestContext } from '../nav'
 import { PreviewPanel } from '../PreviewPanel'
 
@@ -153,18 +154,20 @@ export function RecordScreen({
 
   return (
     <div className="mx-auto max-w-[1100px] px-6 pb-12 pt-6">
-      <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="text-[20px] font-semibold tracking-tight">{def.title}</h2>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">
+      <PageHeader
+        title={def.title}
+        description={
+          <>
             {hand === 'left' ? 'Left' : 'Right'} hand · {def.durationMs / 1000} s
             {subjectCtx ? ` · ${subjectCtx.subject.code}` : ''}
-          </p>
-        </div>
-        <Button variant="ghost" onClick={cancel}>
-          Cancel
-        </Button>
-      </header>
+          </>
+        }
+        actions={
+          <Button variant="ghost" onClick={cancel}>
+            Cancel
+          </Button>
+        }
+      />
 
       <div className="mb-4 grid grid-cols-2 items-stretch gap-4 min-w-0-children max-[900px]:grid-cols-1">
         <PreviewPanel highlight={def.highlightLandmarks} />

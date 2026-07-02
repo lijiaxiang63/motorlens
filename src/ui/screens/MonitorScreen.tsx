@@ -12,6 +12,7 @@ import { buildSessionReport, downloadReport } from '../../report/export'
 import type { Hand, JointId, JointSummaries, LandmarkFrame } from '../../types'
 import { StreamChart, type StreamChartHandle } from '../charts/charts'
 import { Button } from '../components/ui/button'
+import { PageHeader } from '../components/PageHeader'
 import { fmt } from '../format'
 import { useFrameSubscription } from '../hooks/useFrameSubscription'
 import { useInterval } from '../hooks/useInterval'
@@ -88,31 +89,29 @@ export function MonitorScreen() {
 
   return (
     <div className="mx-auto max-w-[1100px] px-6 pb-12 pt-6">
-      <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="text-[20px] font-semibold tracking-tight">Joint Monitor</h2>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">
-            Flexion per joint · click a cell to chart it
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="ghost"
-            onClick={() => {
-              tracker.reset()
-              setSummaries(tracker.summaries())
-            }}
-          >
-            <RotateCcw /> Reset ROM
-          </Button>
-          <Button variant="ghost" onClick={exportSession}>
-            <FileDown /> Export JSON
-          </Button>
-          <Button variant="primary" onClick={() => navigate({ name: 'home' })}>
-            Home
-          </Button>
-        </div>
-      </header>
+      <PageHeader
+        title="Joint Monitor"
+        description="Flexion per joint · click a cell to chart it"
+        actions={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                tracker.reset()
+                setSummaries(tracker.summaries())
+              }}
+            >
+              <RotateCcw /> Reset ROM
+            </Button>
+            <Button variant="ghost" onClick={exportSession}>
+              <FileDown /> Export JSON
+            </Button>
+            <Button variant="primary" onClick={() => navigate({ name: 'home' })}>
+              Home
+            </Button>
+          </>
+        }
+      />
 
       <div className="mb-4 grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start gap-4 max-[900px]:grid-cols-1">
         <PreviewPanel className="sticky top-3 max-[900px]:static" />

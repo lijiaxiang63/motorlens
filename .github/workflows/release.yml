@@ -1,0 +1,67 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run typecheck
+
+      - run: npm run typecheck:electron
+
+      - run: npm test
+
+  build:
+    needs: test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            args: --mac dmg zip
+          - os: windows-latest
+            args: --win nsis
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # postinstall (scripts/fetch-assets.mjs) is pure node:fs + fetch —
+      # cross-platform — but its download failure is silent by design (falls
+      # back to a CDN URL at runtime). The next step turns a failed download
+      # into a hard CI failure instead of silently shipping a build that
+      # needs network access for MediaPipe.
+      - run: npm ci
+
+      - name: Verify MediaPipe model was fetched
+        shell: bash
+        run: test -f public/mediapipe/hand_landmarker.task
+
+      - run: npx vite build
+
+      - run: node scripts/build-electron.mjs
+
+      - name: Package and publish (draft release)
+        run: npx electron-builder ${{ matrix.args }} --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

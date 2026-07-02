@@ -110,4 +110,6 @@ export const SEG_MERGE_GAP_MS = 2_500
 /** Flag auto-detected segments below this confidence for manual review. */
 export const SEG_CONFIDENCE_WARN = 0.7
 
-export const APP_VERSION = '0.1.0'
+// Single-sourced from package.json via vite.config.ts / vitest.config.ts's
+// `define` — see src/vite-env.d.ts for the ambient declaration.
+export const APP_VERSION = __APP_VERSION__

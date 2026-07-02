@@ -1,7 +1,8 @@
-# ◎ MotorLens
+# MotorLens
 
-Camera-based hand motor function assessment in the browser. MotorLens uses
-your laptop camera and [MediaPipe hand tracking](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker)
+Camera-based hand motor function assessment, available as a browser app or a
+native desktop app (macOS/Windows). MotorLens uses your camera and
+[MediaPipe hand tracking](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker)
 (21 landmarks per hand) to run structured, timed motor tests and compute
 standardized kinematic parameters — finger-tapping speed, fist open–close
 speed, amplitude decrement, rhythm variability, and per-joint flexion angles.
@@ -11,8 +12,8 @@ speed, amplitude decrement, rhythm variability, and per-joint flexion angles.
 > items 3.4/3.5). It is **not a diagnostic device** and its outputs are not
 > medical advice.
 >
-> **Privacy** — all processing runs on-device in your browser. No video,
-> landmarks, or results ever leave your computer.
+> **Privacy** — all processing runs on-device. No video, landmarks, or
+> results ever leave your computer.
 
 ## Assessments
 
@@ -28,6 +29,58 @@ count → results with metric cards, three charts, and JSON export. Exported
 sessions can be dragged back onto the home screen to reproduce their results
 exactly.
 
+Beyond ad-hoc quick tests, the **Subjects** workflow registers a subject, runs
+the full test battery per hand, and auto-saves every result (optionally with
+the source video) to on-device storage; **Video Analysis** uploads an existing
+recording, auto-segments it into individual taps/fists for review and
+correction, and analyzes each confirmed segment with the same pipeline.
+"Export all (ZIP)" bundles every subject's results, videos, and a
+`summary.csv` into one download.
+
+## Desktop app
+
+Download the latest macOS or Windows build from
+[Releases](https://github.com/lijiaxiang63/motorlens/releases). The desktop
+app is the same code as the browser build, wrapped in Electron for native
+window chrome, a Dock/taskbar icon, and native save/open dialogs — camera
+processing and storage stay entirely on-device either way.
+
+**Installing an unsigned build** — the app isn't code-signed yet (no Apple
+Developer ID / no EV certificate), so the OS will warn on first launch:
+
+- **macOS**: Gatekeeper blocks the unidentified developer. Right-click the
+  app → *Open* → *Open* (only needed once), or clear the quarantine flag from
+  Terminal: `xattr -dr com.apple.quarantine /Applications/MotorLens.app`.
+- **Windows**: SmartScreen shows "Windows protected your PC". Click
+  *More info* → *Run anyway*.
+
+**Auto-update** differs by platform until the app is signed:
+
+- **Windows** downloads and installs updates in-app (Settings → *Check for
+  updates*).
+- **macOS** checks GitHub for a newer release and, if found, links out to the
+  release page to download manually — Apple's installer (Squirrel.Mac)
+  refuses to install unsigned updates in-app, so this is the closest
+  unsigned macOS can get to auto-update.
+
+Both platforms check once on launch (silently, unless an update is found) and
+on demand from Settings.
+
+### Release process (maintainers)
+
+```bash
+npm version <patch|minor|major>   # bumps package.json, the single source for
+                                   # APP_VERSION (embedded in every exported
+                                   # report) and the packaged app's version
+git push && git push --tags
+```
+
+Pushing a `v*` tag triggers `.github/workflows/release.yml`: tests run once,
+then macOS and Windows builds run in parallel and upload a **draft** GitHub
+Release (dmg, zip, exe installer, block maps, and the `latest*.yml` update
+feeds electron-updater reads). Sanity-check the draft's assets, then publish
+it — that's the moment auto-update starts offering it to existing installs.
+
 ## Setup
 
 Requires Node ≥ 20 and a Chromium-based browser or Safari.
@@ -36,6 +89,10 @@ Requires Node ≥ 20 and a Chromium-based browser or Safari.
 npm install        # also copies the MediaPipe wasm runtime and downloads the
                    # hand landmarker model (~7.5 MB) into public/mediapipe/
 npm run dev        # http://localhost:5173
+npm run dev:app    # same app, running inside Electron (macOS-only camera
+                   # verification so far — see the caveat below)
+npm run build:app  # produces a local, unsigned .dmg/.zip in release/
+                   # (macOS host required — uses iconutil)
 ```
 
 ### LAN access (other devices on your network)
@@ -127,6 +184,12 @@ npm run build
 7. Joint Monitor: straight fingers read < ~15°, a full fist puts PIP joints
    around 90–110°, ROM accumulates, Reset works.
 8. Export JSON from a result, drag it back onto home → identical metrics.
+
+> **Platform caveat** — the checklist above (and `SWAP_RAW_HANDEDNESS` in
+> `src/config.ts`) has only been verified on macOS with a built-in camera.
+> The Windows desktop build has not had a real-camera check yet; if
+> handedness reads flipped on Windows, that flag may need a platform-specific
+> value.
 
 ## Architecture notes
 

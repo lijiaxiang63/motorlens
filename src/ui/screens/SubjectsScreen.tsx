@@ -13,6 +13,7 @@ import {
 } from '../../store/subjects'
 import { Button } from '../components/ui/button'
 import { Card } from '../components/ui/card'
+import { PageHeader } from '../components/PageHeader'
 import { StatusChip } from '../components/StatusChip'
 import { emptySubject, SubjectForm } from '../components/SubjectForm'
 import { useNav } from '../nav'
@@ -87,30 +88,28 @@ export function SubjectsScreen() {
 
   return (
     <div className="mx-auto max-w-[1100px] px-6 pb-12 pt-6">
-      <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="text-[22px] font-semibold tracking-tight">Subjects</h2>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">
-            Register subjects, run the test battery, export everything at the end.
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {storageMb !== null && (
-            <StatusChip state="idle">
-              <span className="tabular-nums">
-                {storageMb < 100 ? storageMb.toFixed(1) : storageMb.toFixed(0)} MB stored
-              </span>
-            </StatusChip>
-          )}
-          <Button
-            variant="primary"
-            disabled={results.length === 0 || exporting !== null}
-            onClick={() => void exportAll()}
-          >
-            <Archive /> {exporting ?? 'Export all (ZIP)'}
-          </Button>
-        </div>
-      </header>
+      <PageHeader
+        title="Subjects"
+        description="Register subjects, run the test battery, export everything at the end."
+        actions={
+          <>
+            {storageMb !== null && (
+              <StatusChip state="idle">
+                <span className="tabular-nums">
+                  {storageMb < 100 ? storageMb.toFixed(1) : storageMb.toFixed(0)} MB stored
+                </span>
+              </StatusChip>
+            )}
+            <Button
+              variant="primary"
+              disabled={results.length === 0 || exporting !== null}
+              onClick={() => void exportAll()}
+            >
+              <Archive /> {exporting ?? 'Export all (ZIP)'}
+            </Button>
+          </>
+        }
+      />
 
       <div className="mb-4">
         <Button variant="primary" onClick={() => setShowForm(true)} disabled={showForm}>
@@ -140,9 +139,11 @@ export function SubjectsScreen() {
       {subjects === null ? (
         <p className="text-muted-foreground">Loading…</p>
       ) : subjects.length === 0 ? (
-        <Card className="flex flex-col items-center gap-2 py-10 text-center">
-          <UserPlus className="size-8 text-muted-foreground/60" />
-          <p className="text-muted-foreground">
+        <Card className="flex flex-col items-center gap-3 py-14 text-center">
+          <div className="flex size-12 items-center justify-center rounded-full bg-accent/10 text-accent">
+            <UserPlus className="size-6" />
+          </div>
+          <p className="max-w-[320px] text-[13.5px] text-muted-foreground">
             No subjects yet — register the first one to start a session.
           </p>
         </Card>

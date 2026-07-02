@@ -1,7 +1,7 @@
 {
   "name": "motorlens",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "Camera-based hand motor function assessment — finger tapping, fist open-close, and joint kinematics from MediaPipe hand tracking.",
   "author": "MotorLens",
@@ -13,6 +13,7 @@
     "build": "tsc --noEmit && vite build",
     "build:electron": "node scripts/build-electron.mjs",
     "build:app": "npm run typecheck && npm run typecheck:electron && vite build && npm run build:electron && electron-builder --mac dmg zip",
+    "icons": "node scripts/make-icons.mjs",
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -43,6 +44,7 @@
     "@vitejs/plugin-react": "^6.0.3",
     "electron": "^43.0.0",
     "electron-builder": "^26.15.3",
+    "electron-updater": "^6.8.9",
     "esbuild": "^0.28.1",
     "tailwindcss": "^4.3.2",
     "typescript": "^6.0.3",
@@ -62,11 +64,19 @@
     "asarUnpack": [
       "dist/mediapipe/**"
     ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "lijiaxiang63",
+        "repo": "motorlens"
+      }
+    ],
     "mac": {
       "target": [
         "dmg",
         "zip"
       ],
+      "icon": "build/icon.icns",
       "category": "public.app-category.medical",
       "identity": null,
       "hardenedRuntime": true,
@@ -75,6 +85,21 @@
       "extendInfo": {
         "NSCameraUsageDescription": "MotorLens uses your camera to track hand movements for motor function assessment. Video is processed entirely on your device and is only saved if you choose to keep it."
       }
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
     }
   }
 }

@@ -21,6 +21,7 @@ import {
   systemPreferences,
 } from 'electron'
 import { IPC, type SaveFileRequest } from './shared'
+import { initUpdater } from './updater'
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -141,6 +142,8 @@ let win: BrowserWindow | null = null
 async function createWindow(): Promise<void> {
   const state = await loadWindowState()
 
+  const isMac = process.platform === 'darwin'
+
   win = new BrowserWindow({
     width: state.width,
     height: state.height,
@@ -148,14 +151,32 @@ async function createWindow(): Promise<void> {
     y: state.y,
     minWidth: 1000,
     minHeight: 680,
-    backgroundColor: '#0e1116', // matches --bg; avoids a white flash on load
+    // Transparent on mac so the vibrancy material below shows through the
+    // sidebar; opaque elsewhere to avoid a white flash on load (matches
+    // --bg). `show:false` + `ready-to-show` is what actually prevents any
+    // flash — don't drop that gate if this ever changes. Electron only
+    // honors the alpha channel in `backgroundColor` when `transparent` is
+    // also set — without it the alpha byte is ignored (renders opaque).
+    backgroundColor: isMac ? '#00000000' : '#0e1116',
     show: false,
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    titleBarStyle: isMac ? 'hiddenInset' : 'default',
+    // Reserved band the Sidebar header matches with `pt-[52px]` (Shell.tsx) —
+    // keep the two in sync if either changes.
+    ...(isMac
+      ? { transparent: true, trafficLightPosition: { x: 18, y: 18 }, vibrancy: 'sidebar' as const }
+      : // macOS reads the icon from the app bundle (build/icon.icns via
+        // electron-builder); Windows/Linux need it set on the window itself.
+        // Harmless if dist/icon.png doesn't exist yet (e.g. dev:app before a
+        // build) — Electron just falls back to the default icon.
+        { icon: path.join(DIST_DIR, 'icon.png') }),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       sandbox: true,
       nodeIntegration: false,
+      // Lets the renderer (index.html's pre-paint script) know vibrancy is
+      // active without an IPC round-trip — argv is readable synchronously.
+      additionalArguments: isMac ? ['--motorlens-vibrancy'] : [],
     },
   })
 
@@ -216,6 +237,11 @@ function registerIpcHandlers(): void {
 app.whenReady().then(async () => {
   registerAppProtocol()
   registerIpcHandlers()
+  // Registers ipcMain handlers synchronously — must happen before
+  // createWindow() so the renderer (which can call updateCheck() as soon as
+  // window.motorlens exists) never races an unregistered handler. The
+  // `() => win` getter means it's safe to call before `win` is assigned.
+  initUpdater(() => win)
 
   // Camera-only permission grants; everything else is denied.
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => {

@@ -1,7 +1,7 @@
 // Subject detail: info header, test checklist (the batch-session workbench),
 // saved results, and entry points for recording and video upload.
 
-import { Check, FileVideo, Minus, Pencil, Trash2, Video, X } from 'lucide-react'
+import { Check, ClipboardList, FileVideo, Minus, Pencil, Trash2, Video, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { TEST_DEFS, testDefById } from '../../protocol/definitions'
 import {
@@ -20,6 +20,7 @@ import { Button } from '../components/ui/button'
 import { Card, CardDescription, CardFooter, CardTitle } from '../components/ui/card'
 import { CheckboxRow } from '../components/ui/field'
 import { ConfirmDialog } from '../components/ui/alert-dialog'
+import { PageHeader } from '../components/PageHeader'
 import { SubjectForm } from '../components/SubjectForm'
 import { fmt } from '../format'
 import { useNav } from '../nav'
@@ -117,27 +118,23 @@ export function SubjectScreen({ subjectId, notice }: { subjectId: string; notice
 
   return (
     <div className="mx-auto max-w-[1100px] px-6 pb-12 pt-6">
-      <header className="mb-5 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="text-[20px] font-semibold tracking-tight">
-            {s.name ? `${s.code} — ${s.name}` : s.code}
-          </h2>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">
-            {metaLine(s) || 'No details recorded'}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="ghost" onClick={() => navigate({ name: 'subjects' })}>
-            ← Subjects
-          </Button>
-          <Button variant="ghost" onClick={() => setEditing((v) => !v)}>
-            <Pencil /> Edit
-          </Button>
-          <Button variant="ghost-danger" onClick={() => setConfirmDeleteSubject(true)}>
-            <Trash2 /> Delete subject
-          </Button>
-        </div>
-      </header>
+      <PageHeader
+        title={s.name ? `${s.code} — ${s.name}` : s.code}
+        description={metaLine(s) || 'No details recorded'}
+        actions={
+          <>
+            <Button variant="ghost" onClick={() => navigate({ name: 'subjects' })}>
+              ← Subjects
+            </Button>
+            <Button variant="ghost" onClick={() => setEditing((v) => !v)}>
+              <Pencil /> Edit
+            </Button>
+            <Button variant="ghost-danger" onClick={() => setConfirmDeleteSubject(true)}>
+              <Trash2 /> Delete subject
+            </Button>
+          </>
+        }
+      />
 
       {noticeShown && notice && (
         <div className="mb-4 flex items-center justify-between gap-3 rounded-xl border border-ok/45 bg-ok-surface px-3.5 py-2.5 text-[13.5px] text-ok">
@@ -253,7 +250,14 @@ export function SubjectScreen({ subjectId, notice }: { subjectId: string; notice
         Results{results.length > 0 ? ` (${results.length})` : ''}
       </h3>
       {results.length === 0 ? (
-        <p className="text-muted-foreground">No results yet.</p>
+        <Card className="flex flex-col items-center gap-3 py-10 text-center">
+          <div className="flex size-11 items-center justify-center rounded-full bg-accent/10 text-accent">
+            <ClipboardList className="size-5" />
+          </div>
+          <p className="max-w-[320px] text-[13.5px] text-muted-foreground">
+            No results yet — run a test from the checklist above.
+          </p>
+        </Card>
       ) : (
         <div className="flex flex-col gap-2.5">
           {results.map((r) => {

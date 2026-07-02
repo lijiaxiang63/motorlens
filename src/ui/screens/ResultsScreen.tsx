@@ -15,6 +15,7 @@ import {
 } from '../../store/subjects'
 import { SignalChart, EventChart } from '../charts/charts'
 import { MetricCard } from '../components/MetricCard'
+import { PageHeader } from '../components/PageHeader'
 import { StatusChip } from '../components/StatusChip'
 import { Button } from '../components/ui/button'
 import { fmt } from '../format'
@@ -162,47 +163,51 @@ export function ResultsScreen({ result: r }: { result: ResultProps }) {
 
   return (
     <div className="mx-auto max-w-[1100px] px-6 pb-12 pt-6">
-      <header className="mb-4 flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h2 className="text-[20px] font-semibold tracking-tight">{def.title} — results</h2>
-          <p className="mt-0.5 text-[13px] text-muted-foreground">
+      <PageHeader
+        className="mb-4"
+        title={`${def.title} — results`}
+        description={
+          <>
             {subjectBit}
             {hand === 'left' ? 'Left' : 'Right'} hand · {startedDate.toLocaleString()} ·{' '}
             {fmt(q.meanFps, 0)} fps · {(q.detectionRate * 100).toFixed(0)}% detection
             {sourceBit}
-          </p>
-          {savedChip && (
-            <StatusChip state={savedChip.state} className="mt-1.5">
-              {savedChip.text}
-            </StatusChip>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button variant="ghost" onClick={() => void downloadReport(report)}>
-            Export JSON
-          </Button>
-          <Button variant="ghost" onClick={() => window.print()}>
-            Print
-          </Button>
-          <Button variant="ghost" onClick={() => void repeatTest()}>
-            Repeat test
-          </Button>
-          {r.subject && (
-            <Button
-              variant="primary"
-              onClick={() => navigate({ name: 'subject', subjectId: r.subject!.id })}
-            >
-              Next test →
+          </>
+        }
+        actions={
+          <>
+            <Button variant="ghost" onClick={() => void downloadReport(report)}>
+              Export JSON
             </Button>
-          )}
-          <Button
-            variant={r.subject ? 'ghost' : 'primary'}
-            onClick={() => navigate({ name: 'home' })}
-          >
-            Home
-          </Button>
-        </div>
-      </header>
+            <Button variant="ghost" onClick={() => window.print()}>
+              Print
+            </Button>
+            <Button variant="ghost" onClick={() => void repeatTest()}>
+              Repeat test
+            </Button>
+            {r.subject && (
+              <Button
+                variant="primary"
+                onClick={() => navigate({ name: 'subject', subjectId: r.subject!.id })}
+              >
+                Next test →
+              </Button>
+            )}
+            <Button
+              variant={r.subject ? 'ghost' : 'primary'}
+              onClick={() => navigate({ name: 'home' })}
+            >
+              Home
+            </Button>
+          </>
+        }
+      >
+        {savedChip && (
+          <StatusChip state={savedChip.state} className="mt-1.5">
+            {savedChip.text}
+          </StatusChip>
+        )}
+      </PageHeader>
 
       {warnings.length > 0 && (
         <div className="mb-4 flex flex-col gap-1 rounded-xl border border-warn/45 bg-warn-surface px-3.5 py-2.5 text-[13.5px] text-warn">

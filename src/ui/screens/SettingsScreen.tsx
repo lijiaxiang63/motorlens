@@ -4,11 +4,65 @@
 
 import { useEffect, useState } from 'react'
 import { APP_VERSION } from '../../config'
-import { isDesktop } from '../../platform'
+import { isDesktop, type UpdateStatus } from '../../platform'
 import { getSaveVideoSetting, setSaveVideoSetting } from '../../store/subjects'
+import { Button } from '../components/ui/button'
 import { Card, CardDescription, CardTitle } from '../components/ui/card'
 import { CheckboxRow, Field, Select } from '../components/ui/field'
+import { PageHeader } from '../components/PageHeader'
 import { useTheme, type ThemePref } from '../theme'
+
+/** "Check for updates" row inside the About card — desktop only. Renders
+ * nothing until the bridge's update methods exist (older preload / browser
+ * build). See electron/updater.ts for the state machine. */
+function UpdateRow() {
+  const [status, setStatus] = useState<UpdateStatus | null>(null)
+
+  useEffect(() => {
+    const bridge = window.motorlens
+    if (!bridge?.onUpdateEvent) return
+    return bridge.onUpdateEvent(setStatus)
+  }, [])
+
+  const bridge = window.motorlens
+  if (!bridge?.updateCheck) return null
+
+  const busy = status?.state === 'checking' || status?.state === 'downloading'
+
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2.5 border-t pt-3">
+      <Button variant="outline" size="sm" disabled={busy} onClick={() => void bridge.updateCheck!()}>
+        {status?.state === 'checking' ? 'Checking…' : 'Check for updates'}
+      </Button>
+      <span className="text-[12.5px] text-muted-foreground">
+        {status?.state === 'dev' && 'Auto-update is disabled in dev builds.'}
+        {status?.state === 'not-available' && 'You’re up to date.'}
+        {status?.state === 'error' && `Update check failed: ${status.error}`}
+        {status?.state === 'downloaded' && 'Update ready — restart to install.'}
+        {status?.state === 'downloading' && `Downloading update… ${Math.round(status.percent ?? 0)}%`}
+        {status?.state === 'available' &&
+          (status.canInstall
+            ? `Update ${status.version} available.`
+            : `Update ${status.version} available — download from GitHub.`)}
+      </span>
+      {status?.state === 'available' && !status.canInstall && (
+        <Button variant="ghost" size="sm" onClick={() => void bridge.updateOpenRelease!()}>
+          Download from GitHub
+        </Button>
+      )}
+      {status?.state === 'available' && status.canInstall && (
+        <Button variant="ghost" size="sm" onClick={() => void bridge.updateDownload!()}>
+          Download update
+        </Button>
+      )}
+      {status?.state === 'downloaded' && (
+        <Button variant="primary" size="sm" onClick={() => void bridge.updateInstall!()}>
+          Restart to update
+        </Button>
+      )}
+    </div>
+  )
+}
 
 export function SettingsScreen() {
   const { pref, setPref } = useTheme()
@@ -35,9 +89,7 @@ export function SettingsScreen() {
 
   return (
     <div className="mx-auto max-w-[720px] px-6 pb-12 pt-6">
-      <header className="mb-5">
-        <h2 className="text-[22px] font-semibold tracking-tight">Settings</h2>
-      </header>
+      <PageHeader title="Settings" />
 
       <div className="flex flex-col gap-3">
         <Card>
@@ -77,6 +129,7 @@ export function SettingsScreen() {
             diagnostic device. All processing happens on this device; no video or data leaves your
             computer.
           </CardDescription>
+          <UpdateRow />
         </Card>
       </div>
     </div>

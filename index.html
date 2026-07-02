@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <title>MotorLens — Hand Motor Function Assessment</title>
     <script>
       // Apply the persisted theme before first paint (no flash). The durable
@@ -17,6 +18,11 @@
         document.documentElement.style.colorScheme = dark ? 'dark' : 'light'
       } catch (e) {
         document.documentElement.classList.add('dark')
+      }
+      // Electron's preload runs before this script and exposes window.motorlens
+      // synchronously — safe to read here with zero IPC and no flash.
+      if (window.motorlens && window.motorlens.flags && window.motorlens.flags.vibrancy) {
+        document.documentElement.classList.add('vibrancy')
       }
     </script>
   </head>
