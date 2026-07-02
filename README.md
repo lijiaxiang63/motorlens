@@ -80,9 +80,10 @@ then macOS and Windows builds run in parallel and each uploads its packaged
 output (dmg, zip, exe installer, block maps, and the `latest*.yml` update
 feeds electron-updater reads) as a workflow artifact. A final `publish` job
 downloads both, generates a brief changelog from the commit log since the
-previous tag, and creates a single **draft** GitHub Release with everything
-attached. Sanity-check the draft's assets, then publish it — that's the
-moment auto-update starts offering it to existing installs.
+previous tag, and creates a single **published** (non-draft) GitHub Release
+with everything attached — that's immediate: existing installs start seeing
+the update as soon as the tag is pushed, so make sure the tag is ready before
+pushing it.
 
 ## Setup
 
