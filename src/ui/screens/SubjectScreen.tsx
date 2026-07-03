@@ -3,7 +3,7 @@
 
 import { Check, ClipboardList, FileVideo, Minus, Pencil, Trash2, Video, X } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { TEST_DEFS, testDefById } from '../../protocol/definitions'
+import { familyOfTest, TEST_DEFS, testDefById } from '../../protocol/definitions'
 import {
   deleteResult,
   deleteSubject,
@@ -16,7 +16,7 @@ import {
   type Subject,
 } from '../../store/subjects'
 import { cycleMetricsOf } from '../../analysis/metricCatalog'
-import type { Hand } from '../../types'
+import type { Hand, RomMetrics } from '../../types'
 import { Button } from '../components/ui/button'
 import { Card, CardDescription, CardFooter, CardTitle } from '../components/ui/card'
 import { CheckboxRow } from '../components/ui/field'
@@ -33,8 +33,13 @@ const HANDS: readonly Hand[] = ['left', 'right']
 
 function metricsSnippet(r: StoredResult): string {
   const def = testDefById(r.testId)
+  if (!def) return ''
+  if (def.family === 'rom') {
+    const m = r.report.metrics as RomMetrics
+    return m.totalActiveRomDeg !== null ? `ROM ${fmt(m.totalActiveRomDeg, 0)}°` : ''
+  }
   const m = cycleMetricsOf(r.report)
-  if (!def || !m) return ''
+  if (!m) return ''
   return `${m.count} ${def.eventNoun[1]} · ${fmt(m.frequencyHz, 2)} Hz`
 }
 
@@ -290,7 +295,9 @@ export function SubjectScreen({ subjectId, notice }: { subjectId: string; notice
         <div className="flex flex-col gap-2.5">
           {results.map((r) => {
             const def = testDefById(r.testId)
-            const comparable = cycleMetricsOf(r.report) !== null
+            // Compare checkbox and per-session Report both need a metric
+            // vocabulary — any family works; only joint_monitor is excluded.
+            const comparable = familyOfTest(r.testId) !== null
             const isSelected = selectedForCompare.has(r.id)
             return (
               <div

@@ -17,9 +17,21 @@ import {
   type ReactNode,
 } from 'react'
 import type { MetricKey } from '../analysis/metricCatalog'
-import type { CycleTestDefinition, TestDefinition } from '../protocol/definitions'
+import type {
+  CycleTestDefinition,
+  RomTestDefinition,
+  TestDefinition,
+} from '../protocol/definitions'
 import type { Subject } from '../store/subjects'
-import type { CycleAnalysis, FrameSource, Hand, LandmarkFrame, ReportSource, TestId } from '../types'
+import type {
+  CycleAnalysis,
+  FrameSource,
+  Hand,
+  LandmarkFrame,
+  ReportSource,
+  RomAnalysis,
+  TestId,
+} from '../types'
 
 /** Threaded through record → results when a test runs for a registered
  *  subject; its absence keeps the original quick-test flow untouched. */
@@ -47,7 +59,20 @@ export interface ResultCommon {
   notes?: string
 }
 
-export type ResultProps = ResultCommon & { def: CycleTestDefinition; analysis: CycleAnalysis }
+/** Correlated def/analysis pairs per test family, discriminated by a
+ *  top-level `family` (nested `def.family` alone would not narrow the
+ *  union). Build instances via buildResultProps (ui/resultProps.ts). */
+export type CycleResultProps = ResultCommon & {
+  family: 'cycle'
+  def: CycleTestDefinition
+  analysis: CycleAnalysis
+}
+export type RomResultProps = ResultCommon & {
+  family: 'rom'
+  def: RomTestDefinition
+  analysis: RomAnalysis
+}
+export type ResultProps = CycleResultProps | RomResultProps
 
 export type ScreenRequest =
   | { name: 'home' }

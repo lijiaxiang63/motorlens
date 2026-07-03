@@ -14,6 +14,7 @@ import {
   PRONOSUP_FC_HZ,
   PRONOSUP_LIVE_Y_RANGE,
   PRONOSUP_TEST_MS,
+  ROM_TEST_MS,
   TAP_FC_HZ,
   TAP_LIVE_Y_RANGE,
   TAP_TEST_MS,
@@ -21,8 +22,9 @@ import {
 import { computeFistMetrics } from '../metrics/fist'
 import { apertureRaw, tapRaw } from '../metrics/kinematics'
 import { computePronosupMetrics, rollDeg } from '../metrics/pronosup'
+import { computeRomMetrics } from '../metrics/rom'
 import { computeTapMetrics } from '../metrics/taps'
-import type { CycleAnalysis, LandmarkFrame, TestId, Vec3 } from '../types'
+import type { CycleAnalysis, LandmarkFrame, RomAnalysis, TestId, Vec3 } from '../types'
 
 export type TestFamily = 'cycle' | 'tremor' | 'rom'
 
@@ -56,7 +58,12 @@ export interface CycleTestDefinition extends TestDefinitionBase {
   compute(frames: LandmarkFrame[]): CycleAnalysis
 }
 
-export type TestDefinition = CycleTestDefinition
+export interface RomTestDefinition extends TestDefinitionBase {
+  family: 'rom'
+  compute(frames: LandmarkFrame[]): RomAnalysis
+}
+
+export type TestDefinition = CycleTestDefinition | RomTestDefinition
 
 export const FINGER_TAP: TestDefinition = {
   id: 'finger_tap',
@@ -121,7 +128,25 @@ export const PRONATION_SUPINATION: TestDefinition = {
   compute: computePronosupMetrics,
 }
 
-export const TEST_DEFS: TestDefinition[] = [FINGER_TAP, FIST_OPEN_CLOSE, PRONATION_SUPINATION]
+export const ROM_TEST: TestDefinition = {
+  id: 'rom_test',
+  family: 'rom',
+  title: 'Range of Motion Test',
+  description:
+    'Open your hand fully flat, then curl it into a complete fist, moving slowly and as far as you can in both directions.',
+  instructions:
+    'Face your palm to the camera. Slowly open the hand completely flat, then curl every finger into a full fist. Repeat the full open–close sweep until the timer ends.',
+  durationMs: ROM_TEST_MS,
+  highlightLandmarks: [0, 4, 8, 12, 16, 20],
+  compute: computeRomMetrics,
+}
+
+export const TEST_DEFS: TestDefinition[] = [
+  FINGER_TAP,
+  FIST_OPEN_CLOSE,
+  PRONATION_SUPINATION,
+  ROM_TEST,
+]
 
 export function testDefById(id: string): TestDefinition | null {
   return TEST_DEFS.find((d) => d.id === id) ?? null

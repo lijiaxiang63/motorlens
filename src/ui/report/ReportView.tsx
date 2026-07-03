@@ -30,12 +30,12 @@ import './report.css'
 type ViewState =
   | { status: 'loading' }
   | { status: 'not-found' }
-  | { status: 'session'; model: SessionReportModel; signalPng: string; amplitudePng: string }
+  | { status: 'session'; model: SessionReportModel; pngs: Record<string, string> }
   | { status: 'subject'; model: SubjectReportModel }
 
 async function loadSession(
   id: string,
-): Promise<{ model: SessionReportModel; signalPng: string; amplitudePng: string } | null> {
+): Promise<{ model: SessionReportModel; pngs: Record<string, string> } | null> {
   const [result, thresholds] = await Promise.all([getResult(id), getReferenceThresholds()])
   if (!result) return null
   const subject = (await getSubject(result.subjectId)) ?? null
@@ -44,13 +44,23 @@ async function loadSession(
 
   // Sequential — snapshotChart's off-layout host is single-use per call, and
   // running these concurrently gives no benefit worth the added complexity.
-  const signalPng = await snapshotChart((el, palette) =>
-    createSignalChart(el, model.charts.signal, model.charts.events, model.charts.signalLabel, 220, palette),
-  )
-  const amplitudePng = await snapshotChart((el, palette) =>
-    createEventChart(el, model.charts.amplitudes, 'amplitude (hand units)', { trend: true, palette }),
-  )
-  return { model, signalPng, amplitudePng }
+  const charts = model.charts
+  const pngs: Record<string, string> = {}
+  if (charts.kind === 'cycle') {
+    pngs.signal = await snapshotChart((el, palette) =>
+      createSignalChart(el, charts.signal, charts.events, charts.signalLabel, 220, palette),
+    )
+    pngs.amplitude = await snapshotChart((el, palette) =>
+      createEventChart(el, charts.amplitudes, charts.amplitudeLabel, { trend: true, palette }),
+    )
+  } else {
+    // rom: per-finger bars and the joint table render as print-safe HTML;
+    // only the flexion trace needs a canvas snapshot.
+    pngs.trace = await snapshotChart((el, palette) =>
+      createSignalChart(el, charts.trace, [], charts.traceLabel, 220, palette),
+    )
+  }
+  return { model, pngs }
 }
 
 async function loadSubject(id: string): Promise<SubjectReportModel | null> {
@@ -128,9 +138,7 @@ export function ReportView({
     )
   }
   if (state.status === 'session') {
-    return (
-      <SessionReportDocument model={state.model} signalPng={state.signalPng} amplitudePng={state.amplitudePng} />
-    )
+    return <SessionReportDocument model={state.model} pngs={state.pngs} />
   }
   return <SubjectReportDocument model={state.model} />
 }

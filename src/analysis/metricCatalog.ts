@@ -6,7 +6,7 @@
 
 import { familyOfTest, testDefById, type TestFamily } from '../protocol/definitions'
 import { fmt } from '../ui/format'
-import type { CycleTestMetrics, SessionReport } from '../types'
+import type { CycleTestMetrics, Finger, RomMetrics, SessionReport } from '../types'
 
 export type CycleMetricKey =
   | 'count'
@@ -22,9 +22,17 @@ export type CycleMetricKey =
   | 'hesitationCount'
   | 'itiMeanMs'
 
-/** Globally unique across families — tremor/ROM key unions join here with
- *  their milestones, so thresholds and trend-route payloads never collide. */
-export type MetricKey = CycleMetricKey
+export type RomMetricKey =
+  | 'romTotalDeg'
+  | 'romThumbDeg'
+  | 'romIndexDeg'
+  | 'romMiddleDeg'
+  | 'romRingDeg'
+  | 'romPinkyDeg'
+
+/** Globally unique across families — the tremor key union joins here with
+ *  its milestone, so thresholds and trend-route payloads never collide. */
+export type MetricKey = CycleMetricKey | RomMetricKey
 
 export type MetricDirection = 'higher-better' | 'lower-better' | 'neutral'
 
@@ -52,8 +60,8 @@ export interface MetricDef<M = CycleTestMetrics> extends MetricInfo {
   getter(m: M): number | null
 }
 
-/** Union of every family's def type — widens as tremor/ROM catalogs land. */
-export type AnyMetricDef = MetricDef<CycleTestMetrics>
+/** Union of every family's def type — widens as the tremor catalog lands. */
+export type AnyMetricDef = MetricDef<CycleTestMetrics> | MetricDef<RomMetrics>
 
 export const METRIC_CATALOG: readonly MetricDef<CycleTestMetrics>[] = [
   {
@@ -211,13 +219,47 @@ export const CYCLE_CATALOG_DEG: readonly MetricDef<CycleTestMetrics>[] = METRIC_
   (def) => ({ ...def, ...(DEG_OVERRIDES[def.key as CycleMetricKey] ?? {}) }),
 )
 
+const romFingerDef = (key: RomMetricKey, finger: Finger, label: string): MetricDef<RomMetrics> => ({
+  key,
+  label,
+  digits: 0,
+  unit: '°',
+  direction: 'higher-better',
+  asymmetry: 'ratio',
+  spark: false,
+  family: 'rom',
+  getter: (m) => m.perFinger[finger],
+})
+
+export const ROM_CATALOG: readonly MetricDef<RomMetrics>[] = [
+  {
+    key: 'romTotalDeg',
+    label: 'Total active ROM',
+    digits: 0,
+    unit: '°',
+    direction: 'higher-better',
+    asymmetry: 'ratio',
+    spark: true,
+    family: 'rom',
+    getter: (m) => m.totalActiveRomDeg,
+  },
+  romFingerDef('romThumbDeg', 'thumb', 'Thumb ROM'),
+  romFingerDef('romIndexDeg', 'index', 'Index ROM'),
+  romFingerDef('romMiddleDeg', 'middle', 'Middle ROM'),
+  romFingerDef('romRingDeg', 'ring', 'Ring ROM'),
+  romFingerDef('romPinkyDeg', 'pinky', 'Pinky ROM'),
+] as const
+
 /** Cue-editor / global-lookup groups: one canonical catalog per family
  *  (degree variants excluded — same keys). Extended as families land. */
 export const CATALOG_GROUPS: readonly {
   family: TestFamily
   title: string
   defs: readonly AnyMetricDef[]
-}[] = [{ family: 'cycle', title: 'Cycle tests', defs: METRIC_CATALOG }]
+}[] = [
+  { family: 'cycle', title: 'Cycle tests', defs: METRIC_CATALOG },
+  { family: 'rom', title: 'Range of motion', defs: ROM_CATALOG },
+]
 
 /** Curated headline subset across every family — the trend sparkline grid
  *  and the subject report's per-hand "latest" cards share this set. */
@@ -233,6 +275,8 @@ export function catalogFor(testId: string): readonly AnyMetricDef[] {
   switch (def.family) {
     case 'cycle':
       return def.signalKind === 'degrees' ? CYCLE_CATALOG_DEG : METRIC_CATALOG
+    case 'rom':
+      return ROM_CATALOG
   }
 }
 
@@ -257,10 +301,12 @@ export function metricByKeyFor(testId: string, key: MetricKey): AnyMetricDef {
 /** Narrows a report's metrics to its family's shape, or null for
  *  joint_monitor / unknown ids. Discriminates on the test id's family,
  *  never on metric fields. Widens to a union as families land. */
-export function reportMetrics(report: SessionReport): CycleTestMetrics | null {
+export function reportMetrics(report: SessionReport): CycleTestMetrics | RomMetrics | null {
   switch (familyOfTest(report.test)) {
     case 'cycle':
       return report.metrics as CycleTestMetrics
+    case 'rom':
+      return report.metrics as RomMetrics
     default:
       return null
   }

@@ -29,6 +29,7 @@ const wsUrl = arg('--ws', null) // attach to an already-running browser/Electron
 const CARD_TITLES = [
   ['fist', 'Fist Open–Close Test'],
   ['pronosup', 'Pronation–Supination Test'],
+  ['rom', 'Range of Motion Test'],
   ['tap', 'Finger Tapping Test'],
 ]
 const cardTitle = (preset) =>
@@ -52,10 +53,16 @@ try {
       const report = await page.eval('JSON.stringify(window.__lastReport)')
       const r = JSON.parse(report)
       const m = r.metrics
+      const summary =
+        typeof m.count === 'number'
+          ? `count=${m.count} freq=${m.frequencyHz?.toFixed(2)}Hz ` +
+            `decrement=${m.amplitudeDecrement?.regressionPct?.toFixed(1)}% ` +
+            `hesitations=${m.rhythm?.hesitationCount}`
+          : m.totalActiveRomDeg !== undefined
+            ? `totalROM=${m.totalActiveRomDeg?.toFixed(0)}deg`
+            : 'metrics=non-cycle'
       console.log(
-        `${preset}: count=${m.count} freq=${m.frequencyHz?.toFixed(2)}Hz ` +
-          `decrement=${m.amplitudeDecrement?.regressionPct?.toFixed(1)}% ` +
-          `hesitations=${m.rhythm?.hesitationCount} events=${r.events.length} frames=${r.raw.frames.length}`,
+        `${preset}: ${summary} events=${r.events.length} frames=${r.raw.frames.length}`,
       )
       if (outDir) writeFileSync(join(outDir, `${preset}.json`), report)
     } catch (err) {

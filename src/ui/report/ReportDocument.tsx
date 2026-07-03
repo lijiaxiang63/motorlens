@@ -8,11 +8,13 @@
 
 import { formatAsymmetryValue, type AsymmetryRow } from '../../analysis/asymmetry'
 import { SPARK_KEYS } from '../../analysis/metricCatalog'
+import { FINGER_JOINTS } from '../../metrics/rom'
 import type {
   ReportMetricRow,
   SessionReportModel,
   SubjectReportModel,
 } from '../../report/clinical'
+import type { Finger, JointSummaries } from '../../types'
 import { Sparkline } from '../components/Sparkline'
 
 // The subject summary's per-hand "latest" card shows only the curated
@@ -79,6 +81,67 @@ function Disclaimer({ text }: { text: string }) {
   )
 }
 
+function RomFingerBars({
+  perFinger,
+}: {
+  perFinger: { finger: string; romDeg: number | null }[]
+}) {
+  const max = Math.max(...perFinger.map((f) => f.romDeg ?? 0), 1e-9)
+  return (
+    <div className="flex flex-col divide-y divide-border rounded-lg border px-3 py-1" style={{ breakInside: 'avoid' }}>
+      {perFinger.map(({ finger, romDeg }) => (
+        <div key={finger} className="grid grid-cols-[80px_1fr_60px] items-center gap-2 py-1 text-[12px]">
+          <span className="capitalize text-muted-foreground">{finger}</span>
+          <div className="flex h-3 items-center">
+            {romDeg !== null && (
+              <div
+                className="h-1.5 rounded-[3px] bg-chart-right"
+                style={{ width: `${(romDeg / max) * 100}%` }}
+              />
+            )}
+          </div>
+          <span className="text-right tabular-nums">{romDeg !== null ? `${romDeg.toFixed(0)}°` : '—'}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function RomJointTable({ joints }: { joints: JointSummaries }) {
+  const fingers = Object.keys(FINGER_JOINTS) as Finger[]
+  return (
+    <div className="overflow-hidden rounded-lg border text-[11.5px]" style={{ breakInside: 'avoid' }}>
+      <div className="grid grid-cols-[70px_1fr_1fr_1fr] gap-2 border-b bg-surface-2 px-2.5 py-1.5 font-medium text-muted-foreground">
+        <span>Finger</span>
+        <span>MCP / CMC</span>
+        <span>PIP / MCP</span>
+        <span>DIP / IP</span>
+      </div>
+      {fingers.map((finger) => (
+        <div
+          key={finger}
+          className="grid grid-cols-[70px_1fr_1fr_1fr] items-center gap-2 border-b px-2.5 py-1.5 last:border-b-0"
+        >
+          <span className="capitalize text-muted-foreground">{finger}</span>
+          {FINGER_JOINTS[finger].map((id) => {
+            const j = joints[id]
+            return (
+              <span key={id} className="tabular-nums">
+                {j.romDeg !== null ? `${j.romDeg.toFixed(0)}°` : '—'}
+                {j.minDeg !== null && j.maxDeg !== null && (
+                  <span className="ml-1 text-[10px] text-muted-foreground">
+                    ({j.minDeg.toFixed(0)}–{j.maxDeg.toFixed(0)}°)
+                  </span>
+                )}
+              </span>
+            )
+          })}
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function AsymmetryBarRow({ row }: { row: AsymmetryRow }) {
   const denom = Math.max(Math.abs(row.left ?? 0), Math.abs(row.right ?? 0), 1e-9)
   const leftPct = row.left !== null ? (Math.abs(row.left) / denom) * 100 : 0
@@ -108,14 +171,12 @@ function AsymmetryBarRow({ row }: { row: AsymmetryRow }) {
 
 export function SessionReportDocument({
   model,
-  signalPng,
-  amplitudePng,
+  pngs,
 }: {
   model: SessionReportModel
-  signalPng: string
-  amplitudePng: string
+  pngs: Record<string, string>
 }) {
-  const { header } = model
+  const { header, charts } = model
   return (
     <div className="report-light mx-auto max-w-[680px] bg-surface p-6 text-foreground">
       {/* A plain div, not a <header> element — @media print's blanket
@@ -148,11 +209,28 @@ export function SessionReportDocument({
       </p>
       <MetricTable rows={model.metrics} />
 
-      <SectionTitle>Signal</SectionTitle>
-      <img src={signalPng} alt="Recorded signal with event markers" className="w-full rounded-lg border" style={{ breakInside: 'avoid' }} />
+      {charts.kind === 'cycle' && (
+        <>
+          <SectionTitle>Signal</SectionTitle>
+          <img src={pngs.signal} alt="Recorded signal with event markers" className="w-full rounded-lg border" style={{ breakInside: 'avoid' }} />
 
-      <SectionTitle>Amplitude per event</SectionTitle>
-      <img src={amplitudePng} alt="Amplitude per event with decrement trend" className="w-full rounded-lg border" style={{ breakInside: 'avoid' }} />
+          <SectionTitle>Amplitude per event</SectionTitle>
+          <img src={pngs.amplitude} alt="Amplitude per event with decrement trend" className="w-full rounded-lg border" style={{ breakInside: 'avoid' }} />
+        </>
+      )}
+
+      {charts.kind === 'rom' && (
+        <>
+          <SectionTitle>ROM per finger</SectionTitle>
+          <RomFingerBars perFinger={charts.perFinger} />
+
+          <SectionTitle>Per-joint range</SectionTitle>
+          <RomJointTable joints={charts.joints} />
+
+          <SectionTitle>Total flexion</SectionTitle>
+          <img src={pngs.trace} alt="Summed joint flexion over the recording" className="w-full rounded-lg border" style={{ breakInside: 'avoid' }} />
+        </>
+      )}
 
       {model.notes && (
         <>

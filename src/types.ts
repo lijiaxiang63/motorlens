@@ -10,7 +10,12 @@ export interface Vec3 {
 
 export type Hand = 'left' | 'right'
 
-export type TestId = 'finger_tap' | 'fist_open_close' | 'pronation_supination' | 'joint_monitor'
+export type TestId =
+  | 'finger_tap'
+  | 'fist_open_close'
+  | 'pronation_supination'
+  | 'rom_test'
+  | 'joint_monitor'
 
 export interface LandmarkFrame {
   /** Milliseconds, monotonic within a session (video mediaTime based). */

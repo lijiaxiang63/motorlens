@@ -8,17 +8,18 @@ import {
   deltaTone,
   formatDelta,
   metricByKeyFor,
+  metricValueOf,
   type MetricKey,
 } from '../../../analysis/metricCatalog'
 import { evaluateThreshold } from '../../../analysis/thresholds'
 import { SignalChart, EventChart } from '../../charts/charts'
 import { MetricCard, type MetricDelta } from '../../components/MetricCard'
 import { fmt } from '../../format'
-import type { ResultProps } from '../../nav'
+import type { CycleResultProps } from '../../nav'
 import { ResultHeader, ResultNotesCard, SectionTitle } from './ResultHeader'
 import { useResultSession } from './useResultSession'
 
-export function CycleResultsView({ result: r }: { result: ResultProps }) {
+export function CycleResultsView({ result: r }: { result: CycleResultProps }) {
   const { def, analysis } = r
   const m = analysis.metrics
   const session = useResultSession(r)
@@ -35,7 +36,7 @@ export function CycleResultsView({ result: r }: { result: ResultProps }) {
   }
 
   function flaggedTone(key: MetricKey): 'warn' | undefined {
-    const value = metricByKeyFor(def.id, key).getter(m)
+    const value = metricValueOf(metricByKeyFor(def.id, key), m)
     return evaluateThreshold(thresholds[key], value) ? 'warn' : undefined
   }
 

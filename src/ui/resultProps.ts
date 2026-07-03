@@ -14,6 +14,8 @@ export function buildResultProps(
 ): ResultProps {
   switch (def.family) {
     case 'cycle':
-      return { ...common, frames, def, analysis: def.compute(frames) }
+      return { ...common, frames, family: 'cycle', def, analysis: def.compute(frames) }
+    case 'rom':
+      return { ...common, frames, family: 'rom', def, analysis: def.compute(frames) }
   }
 }

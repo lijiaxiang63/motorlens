@@ -5,13 +5,24 @@
 // generating a report can never mutate (or even touch) the stored result.
 
 import { APP_VERSION, HAND_SCALE_CV_WARN_PCT } from '../config'
-import { TEST_DEFS, testDefById } from '../protocol/definitions'
+import { familyOfTest, TEST_DEFS, testDefById } from '../protocol/definitions'
 import type { Subject, StoredResult } from '../store/subjects'
-import type { CycleEvent, Hand, QualityMetrics, ReportSubject, Series, SessionReport, TestId } from '../types'
+import type {
+  CycleEvent,
+  CycleTestMetrics,
+  Finger,
+  Hand,
+  JointSummaries,
+  QualityMetrics,
+  ReportSubject,
+  RomMetrics,
+  Series,
+  SessionReport,
+  TestId,
+} from '../types'
 import { asymmetryForPair, type AsymmetryRow } from '../analysis/asymmetry'
 import {
   catalogFor,
-  cycleMetricsOf,
   formatMetric,
   metricByKey,
   metricValue,
@@ -52,19 +63,35 @@ export interface SessionReportHeader {
   sourceFileName: string | null
 }
 
+/** Per-family chart payloads for the session document. Everything is read
+ *  by reference off the stored report — never recomputed from raw frames. */
+export type SessionReportCharts =
+  | {
+      kind: 'cycle'
+      signal: Series
+      events: CycleEvent[]
+      signalLabel: string
+      /** Unit label for the per-event amplitude chart (hand units vs °). */
+      amplitudeLabel: string
+      amplitudes: number[]
+      intervals: number[]
+    }
+  | {
+      kind: 'rom'
+      /** Summed 15-joint flexion trace (the stored report.series). */
+      trace: Series
+      traceLabel: string
+      perFinger: { finger: Finger; romDeg: number | null }[]
+      joints: JointSummaries
+    }
+
 export interface SessionReportModel {
   kind: 'session'
   header: SessionReportHeader
   quality: { label: string; value: string }[]
   qualityWarnings: string[]
   metrics: ReportMetricRow[]
-  charts: {
-    signal: Series
-    events: CycleEvent[]
-    signalLabel: string
-    amplitudes: number[]
-    intervals: number[]
-  }
+  charts: SessionReportCharts
   notes: string | null
   disclaimer: string
 }
@@ -124,8 +151,10 @@ function buildQualityStrip(q: QualityMetrics): { label: string; value: string }[
 }
 
 /** Mirrors ResultsScreen's on-screen warning rules (minus videoCaptureFailed,
- *  which is a live-session UI concern, not part of the stored report). */
-function buildQualityWarnings(q: QualityMetrics, count: number): string[] {
+ *  which is a live-session UI concern, not part of the stored report).
+ *  `count` is null for families without discrete events (the few-events
+ *  warning is cycle-only). */
+function buildQualityWarnings(q: QualityMetrics, count: number | null): string[] {
   const warnings: string[] = []
   if (q.detectionRate < 0.9) {
     warnings.push(
@@ -142,7 +171,7 @@ function buildQualityWarnings(q: QualityMetrics, count: number): string[] {
       `Low frame rate (${q.meanFps.toFixed(0)} fps) — fast movements may be undersampled.`,
     )
   }
-  if (count < 4) {
+  if (count !== null && count < 4) {
     warnings.push('Very few events detected — decrement and rhythm metrics need more repetitions.')
   }
   return warnings
@@ -168,27 +197,59 @@ function subjectLineFromReportSubject(s: ReportSubject): string | null {
   return bits.length > 0 ? bits.join(' · ') : null
 }
 
-/** Builds a per-session clinical report model from an already-stored result.
- *  Read-only: metrics/series/events come straight from `result.report`
- *  (never recomputed), so building a report cannot mutate the stored result.
- *  Returns null when the result has no cycle metrics (e.g. joint_monitor) —
- *  those have no per-session report, only a row in the subject summary. */
-export function buildSessionReportModel(
-  result: StoredResult,
-  subject: Subject | null,
-  thresholds: ReferenceThresholds,
-): SessionReportModel | null {
-  const report = result.report
-  const m = cycleMetricsOf(report)
-  if (m === null) return null
-
+/** Per-family chart payload, read by reference off the stored report. */
+function buildCharts(
+  family: 'cycle' | 'rom',
+  report: SessionReport,
+  testId: TestId,
+): SessionReportCharts {
+  const def = testDefById(testId)
+  if (family === 'rom') {
+    const m = report.metrics as RomMetrics
+    return {
+      kind: 'rom',
+      trace: report.series,
+      traceLabel: 'Total flexion (°)',
+      perFinger: (Object.keys(m.perFinger) as Finger[]).map((finger) => ({
+        finger,
+        romDeg: m.perFinger[finger],
+      })),
+      joints: m.joints,
+    }
+  }
   const itis: number[] = []
   for (let i = 1; i < report.events.length; i++) {
     const a = report.events[i - 1]!
     const b = report.events[i]!
     if (a.segment === b.segment) itis.push(b.tMs - a.tMs)
   }
-  const amplitudes = report.events.map((e) => e.closingAmplitude)
+  const deg = def?.family === 'cycle' && def.signalKind === 'degrees'
+  return {
+    kind: 'cycle',
+    signal: report.series,
+    events: report.events,
+    signalLabel: def && def.family === 'cycle' ? def.signalLabel : 'signal',
+    amplitudeLabel: deg ? 'amplitude (°)' : 'amplitude (hand units)',
+    amplitudes: report.events.map((e) => e.closingAmplitude),
+    intervals: itis,
+  }
+}
+
+/** Builds a per-session clinical report model from an already-stored result.
+ *  Read-only: metrics/series/events come straight from `result.report`
+ *  (never recomputed), so building a report cannot mutate the stored result.
+ *  Returns null only when the result's test id has no family (joint_monitor)
+ *  — those have no per-session report, only a row in the subject summary. */
+export function buildSessionReportModel(
+  result: StoredResult,
+  subject: Subject | null,
+  thresholds: ReferenceThresholds,
+): SessionReportModel | null {
+  const report = result.report
+  const family = familyOfTest(result.testId)
+  // The tremor charts arm lands with its milestone; joint_monitor has none.
+  if (family === null || family === 'tremor') return null
+  const cycleCount = family === 'cycle' ? (report.metrics as CycleTestMetrics).count : null
   const def = testDefById(result.testId)
 
   return {
@@ -209,15 +270,9 @@ export function buildSessionReportModel(
       sourceFileName: report.source?.fileName ?? null,
     },
     quality: report.quality ? buildQualityStrip(report.quality) : [],
-    qualityWarnings: report.quality ? buildQualityWarnings(report.quality, m.count) : [],
+    qualityWarnings: report.quality ? buildQualityWarnings(report.quality, cycleCount) : [],
     metrics: buildMetricRows(report, thresholds),
-    charts: {
-      signal: report.series,
-      events: report.events,
-      signalLabel: def?.signalLabel ?? 'signal',
-      amplitudes,
-      intervals: itis,
-    },
+    charts: buildCharts(family, report, result.testId),
     notes: report.notes ?? null,
     disclaimer: REPORT_DISCLAIMER,
   }
@@ -274,9 +329,16 @@ function buildAsymmetrySection(
 }
 
 function sessionSummary(r: StoredResult): string {
-  const m = cycleMetricsOf(r.report)
-  if (!m) return 'Joint range-of-motion session'
-  return `${m.count} ${m.count === 1 ? 'event' : 'events'} · ${formatMetric(metricByKey('frequencyHz'), m.frequencyHz)}`
+  const family = familyOfTest(r.testId)
+  if (family === 'cycle') {
+    const m = r.report.metrics as CycleTestMetrics
+    return `${m.count} ${m.count === 1 ? 'event' : 'events'} · ${formatMetric(metricByKey('frequencyHz'), m.frequencyHz)}`
+  }
+  if (family === 'rom') {
+    const m = r.report.metrics as RomMetrics
+    return `Total active ROM ${formatMetric(metricByKey('romTotalDeg'), m.totalActiveRomDeg)}`
+  }
+  return 'Joint range-of-motion session'
 }
 
 /** Builds a per-subject summary report: latest metrics and trends per test ×

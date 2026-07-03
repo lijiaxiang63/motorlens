@@ -10,6 +10,7 @@ import {
   formatDelta,
   formatMetric,
   metricByKey,
+  metricValueOf,
 } from './metricCatalog'
 
 describe('metricCatalog', () => {
@@ -25,22 +26,22 @@ describe('metricCatalog', () => {
       hesitations: [{ atMs: 5000, extraMs: 900 }],
     })
     const { metrics } = computeTapMetrics(frames)
-    expect(metricByKey('count').getter(metrics)).toBe(metrics.count)
-    expect(metricByKey('frequencyHz').getter(metrics)).toBe(metrics.frequencyHz)
-    expect(metricByKey('amplitudeMean').getter(metrics)).toBe(metrics.amplitudeMean)
-    expect(metricByKey('amplitudeMax').getter(metrics)).toBe(metrics.amplitudeMax)
-    expect(metricByKey('closingVelMean').getter(metrics)).toBe(metrics.closingVelMean)
-    expect(metricByKey('closingVelPeak').getter(metrics)).toBe(metrics.closingVelPeak)
-    expect(metricByKey('openingVelMean').getter(metrics)).toBe(metrics.openingVelMean)
-    expect(metricByKey('ampDecrementPct').getter(metrics)).toBe(
+    expect(metricValueOf(metricByKey('count'), metrics)).toBe(metrics.count)
+    expect(metricValueOf(metricByKey('frequencyHz'), metrics)).toBe(metrics.frequencyHz)
+    expect(metricValueOf(metricByKey('amplitudeMean'), metrics)).toBe(metrics.amplitudeMean)
+    expect(metricValueOf(metricByKey('amplitudeMax'), metrics)).toBe(metrics.amplitudeMax)
+    expect(metricValueOf(metricByKey('closingVelMean'), metrics)).toBe(metrics.closingVelMean)
+    expect(metricValueOf(metricByKey('closingVelPeak'), metrics)).toBe(metrics.closingVelPeak)
+    expect(metricValueOf(metricByKey('openingVelMean'), metrics)).toBe(metrics.openingVelMean)
+    expect(metricValueOf(metricByKey('ampDecrementPct'), metrics)).toBe(
       metrics.amplitudeDecrement.regressionPct,
     )
-    expect(metricByKey('velDecrementPct').getter(metrics)).toBe(
+    expect(metricValueOf(metricByKey('velDecrementPct'), metrics)).toBe(
       metrics.velocityDecrement.regressionPct,
     )
-    expect(metricByKey('itiCvPct').getter(metrics)).toBe(metrics.rhythm.itiCvPct)
-    expect(metricByKey('hesitationCount').getter(metrics)).toBe(metrics.rhythm.hesitationCount)
-    expect(metricByKey('itiMeanMs').getter(metrics)).toBe(metrics.rhythm.itiMeanMs)
+    expect(metricValueOf(metricByKey('itiCvPct'), metrics)).toBe(metrics.rhythm.itiCvPct)
+    expect(metricValueOf(metricByKey('hesitationCount'), metrics)).toBe(metrics.rhythm.hesitationCount)
+    expect(metricValueOf(metricByKey('itiMeanMs'), metrics)).toBe(metrics.rhythm.itiMeanMs)
   })
 
   it('metricByKey throws on an unknown key', () => {

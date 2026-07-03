@@ -15,17 +15,24 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createTestRecorder, type TestRecorder } from '../../capture/videoRecorder'
 import { LIVE_CHART_WINDOW_MS, LIVE_COUNT_THROTTLE_MS } from '../../config'
+import { JOINT_IDS, JointTracker } from '../../metrics/angles'
 import { ScaleSmoother, worldHandScale } from '../../metrics/kinematics'
 import type { TestDefinition } from '../../protocol/definitions'
 import { TestSession, type Phase, type PositioningIssue } from '../../protocol/testSession'
 import { LiveEma } from '../../signal/filters'
-import type { Hand } from '../../types'
+import type { Hand, JointSummaries } from '../../types'
 import { StreamChart, type StreamChartHandle } from '../charts/charts'
 import { Button } from '../components/ui/button'
+import { JointTable } from '../components/JointTable'
 import { PageHeader } from '../components/PageHeader'
+import { fmt } from '../format'
+import { useInterval } from '../hooks/useInterval'
 import { useNav, type SubjectTestContext } from '../nav'
 import { PreviewPanel } from '../PreviewPanel'
 import { buildResultProps } from '../resultProps'
+
+/** Live ROM chart plots the summed 15-joint flexion (°). */
+const ROM_LIVE_Y_RANGE: readonly [number, number] = [0, 1000]
 
 const ISSUE_TEXT: Record<PositioningIssue, string> = {
   warming_up: 'Looking for your hand…',
@@ -61,23 +68,45 @@ export function RecordScreen({
   const lastDetectedHandRef = useRef<Hand | null>(null)
   const [count, setCount] = useState<number | null>(null)
 
+  // ROM family: live joint tracker feeding the table + total-flexion chart.
+  // Display-only — the saved metrics come from def.compute over the recorded
+  // frames; the tracker resets at recording start so its accumulators match
+  // the measured window.
+  const trackerRef = useRef<JointTracker | null>(null)
+  if (def.family === 'rom') trackerRef.current ??= new JointTracker()
+  const [romSummaries, setRomSummaries] = useState<JointSummaries | null>(null)
+  useInterval(() => {
+    if (trackerRef.current) setRomSummaries(trackerRef.current.summaries())
+  }, 200)
+
   // Camera video capture — subject mode only; null on synthetic/replay
   // sources, unsupported browsers, or when the operator turned it off.
   const wantVideo = subjectCtx?.saveVideo === true && source.kind === 'camera'
 
   useEffect(() => {
-    const ema = new LiveEma(def.fcHz)
+    const ema = def.family === 'cycle' ? new LiveEma(def.fcHz) : null
     const scaler = new ScaleSmoother()
 
     const unsubFrames = source.subscribe((f) => {
       session.onFrame(f)
       if (f.handedness) lastDetectedHandRef.current = f.handedness
-      if (f.world) {
+      if (!f.world) return
+      if (def.family === 'cycle') {
         // 'hand' signals normalize by hand scale; 'degrees' signals plot raw
         // (wrapped) angle values — scale division would be meaningless there.
         const scale = scaler.push(worldHandScale(f.world))
         const raw = def.rawSignal(f.world)
-        chartRef.current?.push(f.t, ema.push(f.t, def.signalKind === 'hand' ? raw / scale : raw))
+        chartRef.current?.push(f.t, ema!.push(f.t, def.signalKind === 'hand' ? raw / scale : raw))
+      } else {
+        const tracker = trackerRef.current!
+        tracker.push(f)
+        // Total flexion = sum of the smoothed per-joint currents.
+        let sum = 0
+        for (const id of JOINT_IDS) {
+          const s = tracker.series(id)
+          if (s.v.length > 0) sum += s.v[s.v.length - 1]!
+        }
+        chartRef.current?.push(f.t, sum)
       }
     })
 
@@ -87,16 +116,20 @@ export function RecordScreen({
           if (!startedRef.current) {
             startedRef.current = true
             startedAtRef.current = new Date().toISOString()
-            setCount(0)
+            if (def.family === 'cycle') setCount(0)
+            // Align the live ROM accumulators with the measured window.
+            trackerRef.current?.reset()
             if (wantVideo) {
               recorderRef.current = createTestRecorder(source.video)
               recorderRef.current?.start()
             }
           }
-          const lastT = p.frames[p.frames.length - 1]!.t
-          if (lastT - lastCountTRef.current >= LIVE_COUNT_THROTTLE_MS) {
-            lastCountTRef.current = lastT
-            setCount(def.compute(p.frames).events.length)
+          if (def.family === 'cycle') {
+            const lastT = p.frames[p.frames.length - 1]!.t
+            if (lastT - lastCountTRef.current >= LIVE_COUNT_THROTTLE_MS) {
+              lastCountTRef.current = lastT
+              setCount(def.compute(p.frames).events.length)
+            }
           }
           break
         }
@@ -153,6 +186,11 @@ export function RecordScreen({
     else navigate({ name: 'home' })
   }
 
+  const startedDateBit = subjectCtx ? ` · ${subjectCtx.subject.code}` : ''
+  const liveTotalRom = romSummaries
+    ? JOINT_IDS.reduce((s, id) => s + (romSummaries[id].romDeg ?? 0), 0)
+    : null
+
   return (
     <div className="mx-auto max-w-[1100px] px-6 pb-12 pt-6">
       <PageHeader
@@ -160,7 +198,7 @@ export function RecordScreen({
         description={
           <>
             {hand === 'left' ? 'Left' : 'Right'} hand · {def.durationMs / 1000} s
-            {subjectCtx ? ` · ${subjectCtx.subject.code}` : ''}
+            {startedDateBit}
           </>
         }
         actions={
@@ -174,19 +212,36 @@ export function RecordScreen({
         <PreviewPanel highlight={def.highlightLandmarks} />
         <div className="flex min-w-0 flex-col gap-3">
           <StagePanel session={session} def={def} hand={hand} detectedRef={lastDetectedHandRef} />
-          <div className="rounded-xl border bg-surface px-2.5 py-4 text-center">
-            <div
-              className="text-[64px] font-bold leading-none tabular-nums text-ok"
-              style={{ visibility: count === null ? 'hidden' : undefined }}
-            >
-              {count ?? 0}
+          {def.family === 'cycle' ? (
+            <div className="rounded-xl border bg-surface px-2.5 py-4 text-center">
+              <div
+                className="text-[64px] font-bold leading-none tabular-nums text-ok"
+                style={{ visibility: count === null ? 'hidden' : undefined }}
+              >
+                {count ?? 0}
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground">{def.eventNoun[1]}</div>
             </div>
-            <div className="mt-1 text-xs text-muted-foreground">{def.eventNoun[1]}</div>
-          </div>
+          ) : (
+            <div className="rounded-xl border bg-surface px-2.5 py-4 text-center">
+              <div className="text-[64px] font-bold leading-none tabular-nums text-ok">
+                {fmt(liveTotalRom, 0, '°')}
+              </div>
+              <div className="mt-1 text-xs text-muted-foreground">total active ROM</div>
+            </div>
+          )}
         </div>
       </div>
 
-      <StreamChart ref={chartRef} yRange={def.liveYRange} windowMs={LIVE_CHART_WINDOW_MS} />
+      {def.family === 'rom' && romSummaries && (
+        <JointTable summaries={romSummaries} className="mb-4" />
+      )}
+
+      <StreamChart
+        ref={chartRef}
+        yRange={def.family === 'cycle' ? def.liveYRange : ROM_LIVE_Y_RANGE}
+        windowMs={LIVE_CHART_WINDOW_MS}
+      />
     </div>
   )
 }

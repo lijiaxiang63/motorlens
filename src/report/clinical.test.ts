@@ -3,8 +3,9 @@ import {
   DEFAULT_REFERENCE_THRESHOLDS,
   type ReferenceThresholds,
 } from '../analysis/thresholds'
+import { computeRomMetrics } from '../metrics/rom'
 import { computeTapMetrics } from '../metrics/taps'
-import { makeTapFrames } from '../replay/synthetic'
+import { makeRomSweepFrames, makeTapFrames } from '../replay/synthetic'
 import type { Subject, StoredResult } from '../store/subjects'
 import type { Hand } from '../types'
 import { buildSessionReportModel, buildSubjectReportModel, REPORT_DISCLAIMER } from './clinical'
@@ -71,6 +72,28 @@ function makeJointResult(id: string, hand: Hand, startedAt: string): StoredResul
     id,
     subjectId: subject.id,
     testId: 'joint_monitor',
+    hand,
+    source: 'live',
+    startedAt,
+    report,
+  }
+}
+
+function makeRomResult(id: string, hand: Hand, startedAt: string): StoredResult {
+  const durationMs = 10_000
+  const { frames } = makeRomSweepFrames({ durationMs })
+  const report = buildSessionReport({
+    test: 'rom_test',
+    hand,
+    startedAt,
+    durationMs,
+    analysis: computeRomMetrics(frames),
+    frames,
+  })
+  return {
+    id,
+    subjectId: subject.id,
+    testId: 'rom_test',
     hand,
     source: 'live',
     startedAt,
@@ -178,6 +201,7 @@ describe('buildSessionReportModel', () => {
   it('reads chart data straight from the stored report (never recomputes)', () => {
     const r = makeTapResult('r1', 'right', dayIso(0))
     const model = buildSessionReportModel(r, subject, DEFAULT_REFERENCE_THRESHOLDS)!
+    if (model.charts.kind !== 'cycle') throw new Error('expected cycle charts')
     expect(model.charts.signal).toBe(r.report.series)
     expect(model.charts.events).toBe(r.report.events)
     expect(model.charts.amplitudes).toHaveLength(r.report.events.length)
@@ -196,6 +220,45 @@ describe('buildSessionReportModel', () => {
 
   it('building a report never mutates the stored result', () => {
     const r = makeTapResult('r1', 'right', dayIso(0))
+    const before = JSON.stringify(r)
+    buildSessionReportModel(r, subject, DEFAULT_REFERENCE_THRESHOLDS)
+    expect(JSON.stringify(r)).toBe(before)
+  })
+
+  it('builds a rom-kind model for a ROM result: catalog rows + reference-based charts', () => {
+    const r = makeRomResult('rom1', 'right', dayIso(0))
+    const model = buildSessionReportModel(r, subject, DEFAULT_REFERENCE_THRESHOLDS)!
+    expect(model.header.testTitle).toBe('Range of Motion Test')
+    // ROM_CATALOG rows in order: total + 5 fingers.
+    expect(model.metrics.map((m) => m.key)).toEqual([
+      'romTotalDeg',
+      'romThumbDeg',
+      'romIndexDeg',
+      'romMiddleDeg',
+      'romRingDeg',
+      'romPinkyDeg',
+    ])
+    expect(model.metrics[0]!.value).not.toBeNull()
+    expect(model.metrics[0]!.value!).toBeGreaterThan(800)
+    if (model.charts.kind !== 'rom') throw new Error('expected rom charts')
+    expect(model.charts.trace).toBe(r.report.series)
+    expect(model.charts.perFinger).toHaveLength(5)
+    expect(model.charts.joints).toBe((r.report.metrics as { joints: unknown }).joints)
+    // The cycle-only "very few events" warning must not fire for ROM.
+    expect(model.qualityWarnings.some((w) => w.includes('Very few events'))).toBe(false)
+  })
+
+  it('flags a ROM metric via a romTotalDeg threshold', () => {
+    const r = makeRomResult('rom1', 'right', dayIso(0))
+    const thresholds: ReferenceThresholds = { romTotalDeg: { warnBelow: 2000 } }
+    const model = buildSessionReportModel(r, subject, thresholds)!
+    const total = model.metrics.find((m) => m.key === 'romTotalDeg')!
+    expect(total.flag).toBe('below')
+    expect(total.cue).toBe('< 2000°')
+  })
+
+  it('building a ROM report never mutates the stored result', () => {
+    const r = makeRomResult('rom1', 'right', dayIso(0))
     const before = JSON.stringify(r)
     buildSessionReportModel(r, subject, DEFAULT_REFERENCE_THRESHOLDS)
     expect(JSON.stringify(r)).toBe(before)

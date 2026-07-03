@@ -23,6 +23,7 @@ if (outDir) mkdirSync(outDir, { recursive: true })
 const CARD_TITLES = [
   ['fist', 'Fist Open–Close Test'],
   ['pronosup', 'Pronation–Supination Test'],
+  ['rom', 'Range of Motion Test'],
   ['tap', 'Finger Tapping Test'],
 ]
 const cardTitle = (preset) =>

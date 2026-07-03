@@ -140,7 +140,7 @@ export function CompareScreen({
           <OverlaySignalChart
             a={cmp.signals.a}
             b={cmp.signals.b}
-            yLabel={defA?.signalLabel ?? 'signal'}
+            yLabel={defA?.family === 'cycle' ? defA.signalLabel : 'signal'}
           />
           <h3 className="mb-2 mt-5 text-sm font-semibold uppercase tracking-[0.8px] text-muted-foreground">
             Amplitude per event

@@ -3,7 +3,13 @@
 // before the pattern loops (the record screen restarts playback on entry).
 
 import type { LandmarkFrame } from '../types'
-import { makeAngleFrames, makeFistFrames, makePronosupFrames, makeTapFrames } from './synthetic'
+import {
+  makeAngleFrames,
+  makeFistFrames,
+  makePronosupFrames,
+  makeRomSweepFrames,
+  makeTapFrames,
+} from './synthetic'
 
 export interface Preset {
   name: string
@@ -71,6 +77,12 @@ function build(name: string): Preset | null {
         frames: makePronosupFrames({ durationMs: DURATION, freqHz: 1, noiseSd: 1.5, seed: 8 })
           .frames,
       }
+    case 'rom-sweep-timed':
+      return {
+        name,
+        description: 'Timed ROM: full-hand open-close sweeps (total ≈ 890°)',
+        frames: makeRomSweepFrames({ durationMs: DURATION }).frames,
+      }
     case 'angles-sweep':
       return {
         name,
@@ -111,6 +123,7 @@ export const PRESET_NAMES = [
   'tap-slow',
   'fist-1p5hz',
   'pronosup-1hz',
+  'rom-sweep-timed',
   'angles-sweep',
 ] as const
 

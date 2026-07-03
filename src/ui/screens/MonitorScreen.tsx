@@ -12,23 +12,14 @@ import { buildSessionReport, downloadReport } from '../../report/export'
 import type { Hand, JointId, JointSummaries, LandmarkFrame } from '../../types'
 import { StreamChart, type StreamChartHandle } from '../charts/charts'
 import { Button } from '../components/ui/button'
+import { JointTable } from '../components/JointTable'
 import { PageHeader } from '../components/PageHeader'
 import { fmt } from '../format'
 import { useFrameSubscription } from '../hooks/useFrameSubscription'
 import { useInterval } from '../hooks/useInterval'
 import { useNav } from '../nav'
 import { PreviewPanel } from '../PreviewPanel'
-import { cn } from '../lib/cn'
 
-const FINGERS = ['thumb', 'index', 'middle', 'ring', 'pinky'] as const
-const JOINT_COLUMNS: Record<(typeof FINGERS)[number], readonly [JointId, JointId, JointId]> = {
-  thumb: ['thumb_cmc', 'thumb_mcp', 'thumb_ip'],
-  index: ['index_mcp', 'index_pip', 'index_dip'],
-  middle: ['middle_mcp', 'middle_pip', 'middle_dip'],
-  ring: ['ring_mcp', 'ring_pip', 'ring_dip'],
-  pinky: ['pinky_mcp', 'pinky_pip', 'pinky_dip'],
-}
-const COLUMN_TITLES = ['MCP / CMC', 'PIP / MCP', 'DIP / IP']
 const FRAME_BUFFER_MS = 30_000
 
 export function MonitorScreen() {
@@ -115,59 +106,7 @@ export function MonitorScreen() {
 
       <div className="mb-4 grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] items-start gap-4 max-[900px]:grid-cols-1">
         <PreviewPanel className="sticky top-3 max-[900px]:static" />
-        <table className="w-full overflow-hidden rounded-xl border bg-surface [border-collapse:separate] [border-spacing:0]">
-          <thead>
-            <tr>
-              <th className="border-b border-r bg-surface-2 px-2.5 py-2 text-xs uppercase tracking-[0.6px] text-muted-foreground">
-                Finger
-              </th>
-              {COLUMN_TITLES.map((c) => (
-                <th
-                  key={c}
-                  className="border-b bg-surface-2 px-2.5 py-2 text-xs uppercase tracking-[0.6px] text-muted-foreground [&:not(:last-child)]:border-r"
-                >
-                  {c}
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {FINGERS.map((finger, fi) => (
-              <tr key={finger}>
-                <td
-                  className={cn(
-                    'border-r bg-surface-2 px-2.5 py-2 text-center font-semibold capitalize',
-                    fi < FINGERS.length - 1 && 'border-b',
-                  )}
-                >
-                  {finger}
-                </td>
-                {JOINT_COLUMNS[finger].map((id) => {
-                  const js = summaries[id]
-                  return (
-                    <td
-                      key={id}
-                      tabIndex={0}
-                      onClick={() => setSelected(id)}
-                      className={cn(
-                        'cursor-pointer px-2.5 py-2 text-center hover:bg-surface-2 [&:not(:last-child)]:border-r',
-                        fi < FINGERS.length - 1 && 'border-b',
-                        selected === id && 'outline outline-2 -outline-offset-2 outline-accent',
-                      )}
-                    >
-                      <div className="text-lg font-semibold tabular-nums">
-                        {fmt(js.currentDeg, 0, '°')}
-                      </div>
-                      <div className="text-[11px] text-muted-foreground">
-                        ROM {fmt(js.romDeg, 0, '°')}
-                      </div>
-                    </td>
-                  )
-                })}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <JointTable summaries={summaries} selected={selected} onSelect={setSelected} />
       </div>
 
       <h3 className="mb-1 mt-4 text-sm font-semibold uppercase tracking-[0.8px] text-muted-foreground">
