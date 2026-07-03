@@ -11,12 +11,16 @@ import {
   FIST_FC_HZ,
   FIST_LIVE_Y_RANGE,
   FIST_TEST_MS,
+  PRONOSUP_FC_HZ,
+  PRONOSUP_LIVE_Y_RANGE,
+  PRONOSUP_TEST_MS,
   TAP_FC_HZ,
   TAP_LIVE_Y_RANGE,
   TAP_TEST_MS,
 } from '../config'
 import { computeFistMetrics } from '../metrics/fist'
 import { apertureRaw, tapRaw } from '../metrics/kinematics'
+import { computePronosupMetrics, rollDeg } from '../metrics/pronosup'
 import { computeTapMetrics } from '../metrics/taps'
 import type { CycleAnalysis, LandmarkFrame, TestId, Vec3 } from '../types'
 
@@ -96,7 +100,28 @@ export const FIST_OPEN_CLOSE: TestDefinition = {
   compute: computeFistMetrics,
 }
 
-export const TEST_DEFS: TestDefinition[] = [FINGER_TAP, FIST_OPEN_CLOSE]
+export const PRONATION_SUPINATION: TestDefinition = {
+  id: 'pronation_supination',
+  family: 'cycle',
+  title: 'Pronation–Supination Test',
+  description:
+    'Rotate your palm toward and away from the camera as big and as fast as you can, like turning a doorknob.',
+  instructions:
+    'Rest your elbow on the table with the forearm upright, palm facing the camera. Rotate the palm away and back as far and as fast as possible until the timer ends.',
+  durationMs: PRONOSUP_TEST_MS,
+  eventNoun: ['turn', 'turns'],
+  signalLabel: 'Palm roll (°)',
+  closingLabel: 'Pronation speed',
+  openingLabel: 'Supination speed',
+  liveYRange: PRONOSUP_LIVE_Y_RANGE,
+  fcHz: PRONOSUP_FC_HZ,
+  signalKind: 'degrees',
+  highlightLandmarks: [0, 5, 17],
+  rawSignal: rollDeg,
+  compute: computePronosupMetrics,
+}
+
+export const TEST_DEFS: TestDefinition[] = [FINGER_TAP, FIST_OPEN_CLOSE, PRONATION_SUPINATION]
 
 export function testDefById(id: string): TestDefinition | null {
   return TEST_DEFS.find((d) => d.id === id) ?? null

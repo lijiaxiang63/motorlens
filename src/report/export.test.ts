@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
+import { computePronosupMetrics } from '../metrics/pronosup'
 import { computeTapMetrics } from '../metrics/taps'
-import { makeTapFrames } from '../replay/synthetic'
+import { makePronosupFrames, makeTapFrames } from '../replay/synthetic'
 import type { ReportSource, ReportSubject } from '../types'
 import { buildSessionReport, parseSessionJson, reportFileName } from './export'
 
@@ -60,6 +61,29 @@ describe('session report round-trip', () => {
       (report.metrics as { frequencyHz: number }).frequencyHz,
       6,
     )
+  })
+
+  it('recomputes identical pronation-supination metrics from exported raw frames', () => {
+    // The roll extractor (cross product + atan2 + unwrap) must survive the
+    // 4-dp world-coordinate rounding on export like the hand-unit extractors:
+    // count exact, frequency to 1e-6 (the locked round-trip contract).
+    const { frames } = makePronosupFrames({ freqHz: 1, durationMs: 4000 })
+    const report = buildSessionReport({
+      test: 'pronation_supination',
+      hand: 'right',
+      startedAt,
+      durationMs: 4000,
+      analysis: computePronosupMetrics(frames),
+      frames,
+    })
+    const parsed = parseSessionJson(JSON.stringify(report))
+    const re = computePronosupMetrics(parsed.raw.frames)
+    expect(re.metrics.count).toBe((report.metrics as { count: number }).count)
+    expect(re.metrics.frequencyHz).toBeCloseTo(
+      (report.metrics as { frequencyHz: number }).frequencyHz,
+      6,
+    )
+    expect(re.metrics.cmPerUnit).toBeNull()
   })
 
   it('derives a stable filename from test, hand, and start time', () => {

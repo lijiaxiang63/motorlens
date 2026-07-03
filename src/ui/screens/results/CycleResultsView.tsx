@@ -46,6 +46,13 @@ export function CycleResultsView({ result: r }: { result: ResultProps }) {
 
   // --- metric cards ---
   const noun = def.eventNoun[1]
+  // Degree tests format amplitudes/velocities in ° (matching CYCLE_CATALOG_DEG);
+  // their cm subtexts vanish naturally because cmPerUnit is null.
+  const deg = def.signalKind === 'degrees'
+  const ampDigits = deg ? 0 : 2
+  const ampUnit = deg ? '°' : ''
+  const velDigits = deg ? 0 : 1
+  const velUnit = deg ? ' °/s' : ' u/s'
   const cmSub = (units: number | null, digits = 1) =>
     units !== null && m.cmPerUnit !== null
       ? `≈ ${(units * m.cmPerUnit).toFixed(digits)} cm`
@@ -97,35 +104,35 @@ export function CycleResultsView({ result: r }: { result: ResultProps }) {
         />
         <MetricCard
           label="Amplitude (mean)"
-          value={fmt(m.amplitudeMean, 2)}
+          value={fmt(m.amplitudeMean, ampDigits, ampUnit)}
           sub={cmSub(m.amplitudeMean)}
           tone={flaggedTone('amplitudeMean')}
           delta={chipFor('amplitudeMean')}
         />
         <MetricCard
           label="Amplitude (max)"
-          value={fmt(m.amplitudeMax, 2)}
+          value={fmt(m.amplitudeMax, ampDigits, ampUnit)}
           sub={cmSub(m.amplitudeMax)}
           tone={flaggedTone('amplitudeMax')}
           delta={chipFor('amplitudeMax')}
         />
         <MetricCard
           label={`${def.closingLabel} (mean)`}
-          value={fmt(m.closingVelMean, 1, ' u/s')}
+          value={fmt(m.closingVelMean, velDigits, velUnit)}
           sub={cmVelSub(m.closingVelMean)}
           tone={flaggedTone('closingVelMean')}
           delta={chipFor('closingVelMean')}
         />
         <MetricCard
           label={`${def.closingLabel} (peak)`}
-          value={fmt(m.closingVelPeak, 1, ' u/s')}
+          value={fmt(m.closingVelPeak, velDigits, velUnit)}
           sub={cmVelSub(m.closingVelPeak)}
           tone={flaggedTone('closingVelPeak')}
           delta={chipFor('closingVelPeak')}
         />
         <MetricCard
           label={`${def.openingLabel} (mean)`}
-          value={fmt(m.openingVelMean, 1, ' u/s')}
+          value={fmt(m.openingVelMean, velDigits, velUnit)}
           sub={cmVelSub(m.openingVelMean)}
           tone={flaggedTone('openingVelMean')}
           delta={chipFor('openingVelMean')}
@@ -179,7 +186,7 @@ export function CycleResultsView({ result: r }: { result: ResultProps }) {
       <div className="grid grid-cols-2 gap-4 min-w-0-children max-[900px]:grid-cols-1">
         <div>
           <SectionTitle>Amplitude per event</SectionTitle>
-          <EventChart values={amplitudes} yLabel="amplitude (hand units)" trend />
+          <EventChart values={amplitudes} yLabel={deg ? 'amplitude (°)' : 'amplitude (hand units)'} trend />
         </div>
         <div>
           <SectionTitle>Interval per event</SectionTitle>

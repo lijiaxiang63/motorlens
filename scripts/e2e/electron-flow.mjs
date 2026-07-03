@@ -18,8 +18,15 @@ const presets = arg('--presets', 'tap-2hz').split(',')
 const outDir = arg('--out-dir', null)
 if (outDir) mkdirSync(outDir, { recursive: true })
 
+// Preset-name prefix → home-screen card title (clickButton matches exactly,
+// including the en dashes). Extend alongside PRESET_NAMES in presets.ts.
+const CARD_TITLES = [
+  ['fist', 'Fist Open–Close Test'],
+  ['pronosup', 'Pronation–Supination Test'],
+  ['tap', 'Finger Tapping Test'],
+]
 const cardTitle = (preset) =>
-  preset.startsWith('fist') ? 'Fist Open–Close Test' : 'Finger Tapping Test'
+  (CARD_TITLES.find(([prefix]) => preset.startsWith(prefix)) ?? CARD_TITLES.at(-1))[1]
 
 // Launch Electron on the built bundle with the synthetic argv passthrough.
 const proc = spawn(

@@ -3,7 +3,7 @@
 // before the pattern loops (the record screen restarts playback on entry).
 
 import type { LandmarkFrame } from '../types'
-import { makeAngleFrames, makeFistFrames, makeTapFrames } from './synthetic'
+import { makeAngleFrames, makeFistFrames, makePronosupFrames, makeTapFrames } from './synthetic'
 
 export interface Preset {
   name: string
@@ -64,6 +64,13 @@ function build(name: string): Preset | null {
         frames: makeFistFrames({ durationMs: DURATION, freqHz: 1.5, noiseSd: 0.02, seed: 7 })
           .frames,
       }
+    case 'pronosup-1hz':
+      return {
+        name,
+        description: 'Steady 1 Hz pronation-supination, ~10 turns in a 10 s window',
+        frames: makePronosupFrames({ durationMs: DURATION, freqHz: 1, noiseSd: 1.5, seed: 8 })
+          .frames,
+      }
     case 'angles-sweep':
       return {
         name,
@@ -103,6 +110,7 @@ export const PRESET_NAMES = [
   'tap-hesitant',
   'tap-slow',
   'fist-1p5hz',
+  'pronosup-1hz',
   'angles-sweep',
 ] as const
 
