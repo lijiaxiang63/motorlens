@@ -2,9 +2,9 @@
 // the column layout is locked down by unit tests. Excel-friendly output:
 // UTF-8 BOM, CRLF line endings, RFC 4180 quoting.
 
-import { familyOfTest } from '../protocol/definitions'
+import { familyOfTest, testDefById } from '../protocol/definitions'
 import type { Subject, StoredResult } from '../store/subjects'
-import type { CycleTestMetrics } from '../types'
+import type { CycleTestMetrics, RomMetrics, TremorMetrics } from '../types'
 
 export const SUMMARY_COLUMNS = [
   'subject_code',
@@ -46,6 +46,20 @@ export const SUMMARY_COLUMNS = [
   'video_file',
   'report_file',
   'result_notes',
+  // Phase 4 append (one deliberate update, locked by csv.test.ts):
+  // 'hand' | 'deg' for cycle tests (pron-sup amplitudes are degrees), ''
+  // for other families; then the tremor and ROM metric columns — blank on
+  // rows of any other family, mirroring the cycle columns' behavior.
+  'amplitude_unit',
+  'tremor_dominant_freq_hz',
+  'tremor_rms_amp_cm',
+  'tremor_index_pct',
+  'total_active_rom_deg',
+  'rom_thumb_deg',
+  'rom_index_deg',
+  'rom_middle_deg',
+  'rom_ring_deg',
+  'rom_pinky_deg',
 ] as const
 
 /** '' for null/undefined; numbers rounded to 4 decimals (trailing zeros trimmed
@@ -67,9 +81,15 @@ export function buildSummaryRow(
   reportFile: string,
 ): string[] {
   const rep = result.report
-  // Family discrimination by test id — non-cycle rows (joint_monitor, and
-  // later tremor/ROM) leave the cycle metric columns blank.
-  const m = familyOfTest(result.testId) === 'cycle' ? (rep.metrics as CycleTestMetrics) : null
+  // Family discrimination by test id — each family fills its own metric
+  // columns and leaves the others blank (joint_monitor fills none).
+  const family = familyOfTest(result.testId)
+  const def = testDefById(result.testId)
+  const m = family === 'cycle' ? (rep.metrics as CycleTestMetrics) : null
+  const tremor = family === 'tremor' ? (rep.metrics as TremorMetrics) : null
+  const rom = family === 'rom' ? (rep.metrics as RomMetrics) : null
+  const amplitudeUnit =
+    def?.family === 'cycle' ? (def.signalKind === 'degrees' ? 'deg' : 'hand') : ''
   const q = rep.quality
   return [
     cell(subject.code),
@@ -111,6 +131,16 @@ export function buildSummaryRow(
     cell(videoFile),
     cell(reportFile),
     cell(rep.notes),
+    amplitudeUnit,
+    cell(tremor?.dominantFreqHz),
+    cell(tremor?.rmsAmplitudeCm),
+    cell(tremor?.tremorIndexPct),
+    cell(rom?.totalActiveRomDeg),
+    cell(rom?.perFinger.thumb),
+    cell(rom?.perFinger.index),
+    cell(rom?.perFinger.middle),
+    cell(rom?.perFinger.ring),
+    cell(rom?.perFinger.pinky),
   ]
 }
 
