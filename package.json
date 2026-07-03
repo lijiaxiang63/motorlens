@@ -1,7 +1,7 @@
 {
   "name": "motorlens",
   "private": true,
-  "version": "0.2.1",
+  "version": "0.3.0",
   "type": "module",
   "description": "Camera-based hand motor function assessment — finger tapping, fist open-close, and joint kinematics from MediaPipe hand tracking.",
   "author": "MotorLens",
