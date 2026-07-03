@@ -264,6 +264,40 @@ export function makeFistFrames(opts: CycleGenOpts = {}): CycleGenResult {
   })
 }
 
+export interface PronosupGenOpts extends CycleGenOpts {
+  /** Extra constant roll added to every frame, degrees. The default keeps
+   *  the measured roll inside (−180, 180]; pass e.g. 100 to force the
+   *  wrapped signal across the ±180° boundary (unwrap stress test). */
+  rollOffsetDeg?: number
+}
+
+/** Pronation-supination frames: the whole neutral template rigidly rotated
+ *  about the vertical (y) axis through the wrist. W9 = (0, −0.08, 0) lies on
+ *  that axis, so |W0−W9| is preserved exactly in both world and projected
+ *  space — hand scale cannot leak into the measured amplitude.
+ *
+ *  Geometry: the flat template's palm normal gives roll φ = 90° − θ for a
+ *  rotation by θ. apply() rotates by θ = 50 − d, so the measured roll is
+ *  40 + d (+ rollOffsetDeg): schedule closures (d minima) are roll MINIMA,
+ *  aligning detected events with truth.eventTimesMs, and peak-to-valley roll
+ *  amplitude equals the scheduled amplitude in degrees exactly. Defaults
+ *  d ∈ [10, 90] → roll ∈ [50, 130]° and rotation ∈ [−40, +40]°, safely away
+ *  from the ±180° wrap and the generate() positivity clamp. */
+export function makePronosupFrames(opts: PronosupGenOpts = {}): CycleGenResult {
+  const o = withDefaults(opts, 90, 10)
+  const offset = opts.rollOffsetDeg ?? 0
+  return generate(o, (d) => {
+    const theta = ((50 - d - offset) * Math.PI) / 180
+    const cos = Math.cos(theta)
+    const sin = Math.sin(theta)
+    return HAND_TEMPLATE.map((p) => ({
+      x: p.x * cos + p.z * sin,
+      y: p.y,
+      z: -p.x * sin + p.z * cos,
+    }))
+  })
+}
+
 // ---------------------------------------------------------------------------
 // Joint-angle generator (forward kinematics)
 

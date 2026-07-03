@@ -3,6 +3,7 @@
 // --- Test protocol ---
 export const TAP_TEST_MS = 10_000
 export const FIST_TEST_MS = 10_000
+export const PRONOSUP_TEST_MS = 10_000
 export const COUNTDOWN_MS = 3_000
 
 // Positioning gates (evaluated over a trailing window of frames)
@@ -23,16 +24,23 @@ export const MAX_GAP_MS = 300
 export const TAP_FC_HZ = 8
 export const FIST_FC_HZ = 5
 export const ANGLE_FC_HZ = 4
+/** Pronation-supination roll is a slower, larger movement than tapping —
+ *  4 Hz keeps a ~1–2 Hz rotation nearly unattenuated while damping jitter. */
+export const PRONOSUP_FC_HZ = 4
 /** Peak-prominence floors (hand units) and adaptive range factor. */
 export const TAP_PROM_FLOOR = 0.15
 export const FIST_PROM_FLOOR = 0.2
+/** Pronation-supination prominence floor, degrees of roll. */
+export const PRONOSUP_PROM_FLOOR = 30
 export const PROM_RANGE_FACTOR = 0.25
 /** Minimum spacing between detected events (physiological limits). */
 export const TAP_MIN_DIST_MS = 125
 export const FIST_MIN_DIST_MS = 200
+export const PRONOSUP_MIN_DIST_MS = 250
 /** Absolute hesitation floors: ITI > max(2·median, this) counts as one. */
 export const TAP_HESITATION_ABS_MS = 400
 export const FIST_HESITATION_ABS_MS = 700
+export const PRONOSUP_HESITATION_ABS_MS = 700
 /** Trailing median window (in detected frames) for the hand-scale signal. */
 export const HAND_SCALE_MEDIAN_WINDOW = 15
 /**
@@ -73,6 +81,8 @@ export const LIVE_CHART_WINDOW_MS = 6_000
 export const LIVE_COUNT_THROTTLE_MS = 250
 export const TAP_LIVE_Y_RANGE: readonly [number, number] = [0, 1.8]
 export const FIST_LIVE_Y_RANGE: readonly [number, number] = [0, 2.6]
+/** Live pronation-supination chart plots the WRAPPED roll (±180°). */
+export const PRONOSUP_LIVE_Y_RANGE: readonly [number, number] = [-180, 180]
 
 // --- Subjects & local storage (IndexedDB) ---
 export const DB_NAME = 'motorlens'
