@@ -7,7 +7,7 @@
 import { useState } from 'react'
 import { ASYMMETRY_WARN_POINTS, ASYMMETRY_WARN_RATIO_PCT } from '../../config'
 import { formatAsymmetryValue, type AsymmetryRow, asymmetryForPair } from '../../analysis/asymmetry'
-import { formatMetric, metricByKey } from '../../analysis/metricCatalog'
+import { formatMetric } from '../../analysis/metricCatalog'
 import type { HandPair } from '../../analysis/pairing'
 import { pairResults } from '../../analysis/pairing'
 import { TEST_DEFS, type TestDefinition } from '../../protocol/definitions'
@@ -29,18 +29,17 @@ function isNotable(row: AsymmetryRow): boolean {
 }
 
 function BarRow({ row }: { row: AsymmetryRow }) {
-  const def = metricByKey(row.key)
   const denom = Math.max(Math.abs(row.left ?? 0), Math.abs(row.right ?? 0), 1e-9)
   const leftPct = row.left !== null ? (Math.abs(row.left) / denom) * 100 : 0
   const rightPct = row.right !== null ? (Math.abs(row.right) / denom) * 100 : 0
 
   return (
     <div className="grid grid-cols-[152px_48px_1fr_48px_60px] items-center gap-2 py-1 text-[12.5px]">
-      <span className="truncate text-muted-foreground" title={def.label}>
-        {def.label}
+      <span className="truncate text-muted-foreground" title={row.label}>
+        {row.label}
       </span>
       <span className="text-right tabular-nums text-muted-foreground">
-        {formatMetric(def, row.left)}
+        {formatMetric(row, row.left)}
       </span>
       <div className="flex h-4 flex-1 items-center">
         <div className="flex flex-1 justify-end">
@@ -61,13 +60,13 @@ function BarRow({ row }: { row: AsymmetryRow }) {
           )}
         </div>
       </div>
-      <span className="tabular-nums text-muted-foreground">{formatMetric(def, row.right)}</span>
+      <span className="tabular-nums text-muted-foreground">{formatMetric(row, row.right)}</span>
       <span className="text-right">
         {row.value === null ? (
           <span className="text-xs text-muted-foreground">—</span>
         ) : (
           <StatusChip state={isNotable(row) ? 'warn' : 'idle'} className="px-1.5 py-0.5">
-            {formatAsymmetryValue(def, row)}
+            {formatAsymmetryValue(row)}
           </StatusChip>
         )}
       </span>

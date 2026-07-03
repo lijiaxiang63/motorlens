@@ -3,7 +3,7 @@
 // validated clinical norms — every report carries the disclaimer (see
 // report/clinical.ts). Pure and DOM-free like the rest of src/analysis/.
 
-import type { MetricDef, MetricKey } from './metricCatalog'
+import type { MetricInfo, MetricKey } from './metricCatalog'
 
 export interface MetricThreshold {
   warnBelow?: number
@@ -38,7 +38,10 @@ export function evaluateThreshold(
 /** Short human-readable cue text for a metric row, e.g. "> 20%", "< 3 Hz".
  *  When both bounds are set, only the warnAbove bound is shown (below/above
  *  cues co-existing on one metric is an edge case, not a common setup). */
-export function formatThresholdCue(def: MetricDef, t: MetricThreshold): string | null {
+export function formatThresholdCue(
+  def: Pick<MetricInfo, 'unit'>,
+  t: MetricThreshold,
+): string | null {
   if (t.warnAbove !== undefined) return `> ${t.warnAbove}${def.unit}`
   if (t.warnBelow !== undefined) return `< ${t.warnBelow}${def.unit}`
   return null

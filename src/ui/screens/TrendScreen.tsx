@@ -4,10 +4,10 @@
 
 import { useEffect, useState } from 'react'
 import {
+  catalogFor,
   formatDelta,
   formatMetric,
-  METRIC_CATALOG,
-  metricByKey,
+  metricByKeyFor,
   type MetricKey,
 } from '../../analysis/metricCatalog'
 import { buildTrend } from '../../analysis/trends'
@@ -57,7 +57,7 @@ export function TrendScreen({
   const def = testDefById(testId)
   if (!def) return <p className="p-6 text-muted-foreground">Unknown test.</p>
 
-  const metricDef = metricByKey(metricKey)
+  const metricDef = metricByKeyFor(testId, metricKey)
   const trend = buildTrend(results, testId, hand, metricKey)
 
   // Per-row "vs previous" delta: current value minus the last non-null value
@@ -101,7 +101,7 @@ export function TrendScreen({
           value={metricKey}
           onChange={(e) => setMetricKey(e.target.value as MetricKey)}
         >
-          {METRIC_CATALOG.map((d) => (
+          {catalogFor(testId).map((d) => (
             <option key={d.key} value={d.key}>
               {d.label}
             </option>

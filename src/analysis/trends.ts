@@ -5,8 +5,14 @@
 
 import { median } from '../signal/stats'
 import type { StoredResult } from '../store/subjects'
-import type { CycleTestMetrics, Hand, TestId } from '../types'
-import { METRIC_CATALOG, cycleMetricsOf, metricByKey, type MetricKey } from './metricCatalog'
+import type { Hand, SessionReport, TestId } from '../types'
+import {
+  catalogFor,
+  metricByKey,
+  metricValue,
+  reportMetrics,
+  type MetricKey,
+} from './metricCatalog'
 
 const MS_PER_DAY = 86_400_000
 
@@ -45,7 +51,7 @@ export function buildTrend(
 ): Trend {
   const def = metricByKey(key)
   const matches = results
-    .filter((r) => r.testId === testId && r.hand === hand && cycleMetricsOf(r.report) !== null)
+    .filter((r) => r.testId === testId && r.hand === hand && reportMetrics(r.report) !== null)
     .slice()
     .sort((a, b) => a.startedAt.localeCompare(b.startedAt))
 
@@ -58,7 +64,7 @@ export function buildTrend(
     resultId: r.id,
     startedAt: r.startedAt,
     tDays: (Date.parse(r.startedAt) - t0) / MS_PER_DAY,
-    value: def.getter(cycleMetricsOf(r.report)!),
+    value: metricValue(def, r.report),
   }))
 
   let deltaVsPrevious: number | null = null
@@ -99,28 +105,30 @@ export function buildTrend(
   return { points, deltaVsPrevious, slopePer30d, line }
 }
 
-/** Results-screen delta chips: for each catalog metric, the current value
- *  minus the last non-null value among `priors` (sorted newest-first
- *  internally) — null when the current value or every prior is null. */
+/** Results-screen delta chips: for each metric in the report's own catalog,
+ *  the current value minus the last non-null value among `priors` (sorted
+ *  newest-first internally) — null when the current value or every prior is
+ *  null. Takes the full current report so the catalog and getters are chosen
+ *  by its test id, not assumed cycle. */
 export function deltasVsPrevious(
-  current: CycleTestMetrics,
+  report: SessionReport,
   priors: StoredResult[],
 ): Partial<Record<MetricKey, number | null>> {
   const sorted = priors
-    .filter((r) => cycleMetricsOf(r.report) !== null)
+    .filter((r) => reportMetrics(r.report) !== null)
     .slice()
     .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
 
   const out: Partial<Record<MetricKey, number | null>> = {}
-  for (const def of METRIC_CATALOG) {
-    const currentValue = def.getter(current)
+  for (const def of catalogFor(report.test)) {
+    const currentValue = metricValue(def, report)
     if (currentValue === null) {
       out[def.key] = null
       continue
     }
     let priorValue: number | null = null
     for (const r of sorted) {
-      const v = def.getter(cycleMetricsOf(r.report)!)
+      const v = metricValue(def, r.report)
       if (v !== null) {
         priorValue = v
         break

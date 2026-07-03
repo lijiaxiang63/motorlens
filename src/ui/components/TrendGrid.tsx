@@ -2,7 +2,7 @@
 // per test × curated headline metric (the catalog's `spark` subset), each
 // showing both hands overlaid — click through to the full trend screen.
 
-import { formatMetric, METRIC_CATALOG } from '../../analysis/metricCatalog'
+import { catalogFor, formatMetric } from '../../analysis/metricCatalog'
 import { buildTrend } from '../../analysis/trends'
 import { TEST_DEFS } from '../../protocol/definitions'
 import type { StoredResult } from '../../store/subjects'
@@ -12,7 +12,6 @@ import { Sparkline } from './Sparkline'
 import { Card, CardTitle } from './ui/card'
 
 const HANDS: readonly Hand[] = ['left', 'right']
-const SPARK_METRICS = METRIC_CATALOG.filter((d) => d.spark)
 
 export function TrendGrid({
   results,
@@ -42,7 +41,9 @@ export function TrendGrid({
         <div key={def.id} className="mt-3">
           <div className="mb-1.5 text-xs font-medium text-muted-foreground">{def.title}</div>
           <div className="grid grid-cols-[repeat(auto-fill,minmax(150px,1fr))] gap-2.5">
-            {SPARK_METRICS.map((metricDef) => {
+            {catalogFor(def.id)
+              .filter((d) => d.spark)
+              .map((metricDef) => {
               const byHand = HANDS.map((hand) => ({
                 hand,
                 trend: buildTrend(results, def.id, hand, metricDef.key),

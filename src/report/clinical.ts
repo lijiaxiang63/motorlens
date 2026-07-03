@@ -7,13 +7,15 @@
 import { APP_VERSION, HAND_SCALE_CV_WARN_PCT } from '../config'
 import { TEST_DEFS, testDefById } from '../protocol/definitions'
 import type { Subject, StoredResult } from '../store/subjects'
-import type { CycleEvent, CycleTestMetrics, Hand, QualityMetrics, ReportSubject, Series, TestId } from '../types'
+import type { CycleEvent, Hand, QualityMetrics, ReportSubject, Series, SessionReport, TestId } from '../types'
 import { asymmetryForPair, type AsymmetryRow } from '../analysis/asymmetry'
 import {
-  METRIC_CATALOG,
+  catalogFor,
   cycleMetricsOf,
   formatMetric,
   metricByKey,
+  metricValue,
+  reportMetrics,
   type MetricKey,
 } from '../analysis/metricCatalog'
 import { pairResults } from '../analysis/pairing'
@@ -94,9 +96,12 @@ export interface SubjectReportModel {
   disclaimer: string
 }
 
-function buildMetricRows(m: CycleTestMetrics, thresholds: ReferenceThresholds): ReportMetricRow[] {
-  return METRIC_CATALOG.map((def) => {
-    const value = def.getter(m)
+function buildMetricRows(
+  report: SessionReport,
+  thresholds: ReferenceThresholds,
+): ReportMetricRow[] {
+  return catalogFor(report.test).map((def) => {
+    const value = metricValue(def, report)
     const t = thresholds[def.key]
     return {
       key: def.key,
@@ -205,7 +210,7 @@ export function buildSessionReportModel(
     },
     quality: report.quality ? buildQualityStrip(report.quality) : [],
     qualityWarnings: report.quality ? buildQualityWarnings(report.quality, m.count) : [],
-    metrics: buildMetricRows(m, thresholds),
+    metrics: buildMetricRows(report, thresholds),
     charts: {
       signal: report.series,
       events: report.events,
@@ -225,7 +230,7 @@ function latestByHand(
 ): { hand: Hand; startedAt: string; metrics: ReportMetricRow[] }[] {
   const byHand = new Map<Hand, StoredResult>()
   for (const r of results) {
-    if (r.testId !== testId || cycleMetricsOf(r.report) === null) continue
+    if (r.testId !== testId || reportMetrics(r.report) === null) continue
     const current = byHand.get(r.hand)
     if (!current || r.startedAt > current.startedAt) byHand.set(r.hand, r)
   }
@@ -236,7 +241,7 @@ function latestByHand(
       out.push({
         hand,
         startedAt: r.startedAt,
-        metrics: buildMetricRows(cycleMetricsOf(r.report)!, thresholds),
+        metrics: buildMetricRows(r.report, thresholds),
       })
     }
   }
@@ -248,7 +253,7 @@ function buildTrendsSection(
   testId: TestId,
 ): SubjectReportModel['tests'][number]['trends'] {
   const out: SubjectReportModel['tests'][number]['trends'] = []
-  for (const def of METRIC_CATALOG.filter((d) => d.spark)) {
+  for (const def of catalogFor(testId).filter((d) => d.spark)) {
     const series: { hand: Hand; points: TrendPoint[] }[] = []
     for (const hand of ['right', 'left'] as const) {
       const trend = buildTrend(results, testId, hand, def.key)
@@ -289,7 +294,7 @@ export function buildSubjectReportModel(
 ): SubjectReportModel {
   const tests: SubjectReportModel['tests'] = []
   for (const def of TEST_DEFS) {
-    const hasAny = results.some((r) => r.testId === def.id && cycleMetricsOf(r.report) !== null)
+    const hasAny = results.some((r) => r.testId === def.id && reportMetrics(r.report) !== null)
     if (!hasAny) continue
     tests.push({
       testId: def.id,

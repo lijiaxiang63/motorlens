@@ -168,7 +168,7 @@ export function useResultSession(r: ResultProps): ResultSession {
           x.startedAt < r.startedAt &&
           x.id !== r.savedResultId,
       )
-      setDeltas(deltasVsPrevious(analysis.metrics, priors))
+      setDeltas(deltasVsPrevious(report, priors))
     })
     return () => {
       alive = false

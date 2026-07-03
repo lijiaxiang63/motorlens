@@ -5,7 +5,7 @@
 // rendering on stale/missing data.
 
 import { useEffect, useRef, useState } from 'react'
-import { deltaTone, formatDelta, formatMetric, metricByKey } from '../../analysis/metricCatalog'
+import { deltaTone, formatDelta, formatMetric } from '../../analysis/metricCatalog'
 import { buildCompare } from '../../analysis/compare'
 import { testDefById } from '../../protocol/definitions'
 import { getResult, getSubject, type StoredResult, type Subject } from '../../store/subjects'
@@ -110,23 +110,22 @@ export function CompareScreen({
           <span className="text-right">Δ (B−A)</span>
         </div>
         {cmp.rows.map((row) => {
-          const def = metricByKey(row.key)
-          const tone = deltaTone(def, row.delta)
+          const tone = deltaTone(row, row.delta)
           return (
             <div
               key={row.key}
               className="grid grid-cols-[1fr_90px_90px_90px] items-center gap-2 border-b px-3.5 py-2 text-[13px] last:border-b-0"
             >
               <span className="text-muted-foreground">{row.label}</span>
-              <span className="text-right tabular-nums">{formatMetric(def, row.a)}</span>
-              <span className="text-right tabular-nums">{formatMetric(def, row.b)}</span>
+              <span className="text-right tabular-nums">{formatMetric(row, row.a)}</span>
+              <span className="text-right tabular-nums">{formatMetric(row, row.b)}</span>
               <span
                 className={
                   'text-right tabular-nums ' +
                   (tone === 'good' ? 'text-ok' : tone === 'bad' ? 'text-danger' : 'text-muted-foreground')
                 }
               >
-                {formatDelta(def, row.delta)}
+                {formatDelta(row, row.delta)}
               </span>
             </div>
           )

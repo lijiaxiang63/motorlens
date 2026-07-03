@@ -7,7 +7,7 @@ import {
   type MetricThreshold,
   type ReferenceThresholds,
 } from '../../analysis/thresholds'
-import { METRIC_CATALOG, type MetricKey } from '../../analysis/metricCatalog'
+import { CATALOG_GROUPS, type MetricKey } from '../../analysis/metricCatalog'
 import { APP_VERSION } from '../../config'
 import { isDesktop, type UpdateStatus } from '../../platform'
 import {
@@ -26,9 +26,11 @@ type BoundKind = 'warnBelow' | 'warnAbove'
 
 function inputsFrom(t: ReferenceThresholds): Record<string, string> {
   const out: Record<string, string> = {}
-  for (const def of METRIC_CATALOG) {
-    out[`${def.key}:warnBelow`] = t[def.key]?.warnBelow?.toString() ?? ''
-    out[`${def.key}:warnAbove`] = t[def.key]?.warnAbove?.toString() ?? ''
+  for (const group of CATALOG_GROUPS) {
+    for (const def of group.defs) {
+      out[`${def.key}:warnBelow`] = t[def.key]?.warnBelow?.toString() ?? ''
+      out[`${def.key}:warnAbove`] = t[def.key]?.warnAbove?.toString() ?? ''
+    }
   }
   return out
 }
@@ -187,32 +189,43 @@ export function SettingsScreen() {
                 <span>Warn below</span>
                 <span>Warn above</span>
               </div>
-              {METRIC_CATALOG.map((def) => (
-                <div key={def.key} className="grid grid-cols-[1fr_92px_92px] items-center gap-2">
-                  <span className="text-[13px] text-foreground">
-                    {def.label}
-                    {def.unit ? ` (${def.unit.trim()})` : ''}
-                  </span>
-                  <Input
-                    type="number"
-                    step="any"
-                    aria-label={`${def.label} warn below`}
-                    value={inputs[`${def.key}:warnBelow`] ?? ''}
-                    onChange={(e) =>
-                      setInputs((prev) => ({ ...prev, [`${def.key}:warnBelow`]: e.target.value }))
-                    }
-                    onBlur={(e) => commitBound(def.key, 'warnBelow', e.target.value)}
-                  />
-                  <Input
-                    type="number"
-                    step="any"
-                    aria-label={`${def.label} warn above`}
-                    value={inputs[`${def.key}:warnAbove`] ?? ''}
-                    onChange={(e) =>
-                      setInputs((prev) => ({ ...prev, [`${def.key}:warnAbove`]: e.target.value }))
-                    }
-                    onBlur={(e) => commitBound(def.key, 'warnAbove', e.target.value)}
-                  />
+              {CATALOG_GROUPS.map((group) => (
+                <div key={group.family} className="contents">
+                  {/* Group headings only once a second family's catalog exists —
+                      with a single group this renders exactly the flat list. */}
+                  {CATALOG_GROUPS.length > 1 && (
+                    <div className="mt-2 px-1 text-[11px] font-semibold uppercase tracking-[0.5px] text-muted-foreground first:mt-0">
+                      {group.title}
+                    </div>
+                  )}
+                  {group.defs.map((def) => (
+                    <div key={def.key} className="grid grid-cols-[1fr_92px_92px] items-center gap-2">
+                      <span className="text-[13px] text-foreground">
+                        {def.label}
+                        {def.unit ? ` (${def.unit.trim()})` : ''}
+                      </span>
+                      <Input
+                        type="number"
+                        step="any"
+                        aria-label={`${def.label} warn below`}
+                        value={inputs[`${def.key}:warnBelow`] ?? ''}
+                        onChange={(e) =>
+                          setInputs((prev) => ({ ...prev, [`${def.key}:warnBelow`]: e.target.value }))
+                        }
+                        onBlur={(e) => commitBound(def.key, 'warnBelow', e.target.value)}
+                      />
+                      <Input
+                        type="number"
+                        step="any"
+                        aria-label={`${def.label} warn above`}
+                        value={inputs[`${def.key}:warnAbove`] ?? ''}
+                        onChange={(e) =>
+                          setInputs((prev) => ({ ...prev, [`${def.key}:warnAbove`]: e.target.value }))
+                        }
+                        onBlur={(e) => commitBound(def.key, 'warnAbove', e.target.value)}
+                      />
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>

@@ -123,24 +123,26 @@ describe('buildTrend', () => {
 })
 
 describe('deltasVsPrevious', () => {
+  // deltasVsPrevious takes the full current report so the catalog/getters are
+  // chosen by its test id — fakeResult's report stands in for the live one.
+  const currentReport = (frequencyHz: number | null) =>
+    fakeResult('current', 'right', dayIso(30), frequencyHz).report
+
   it('uses the last non-null prior, skipping a null-metric newest prior', () => {
-    const current = fakeMetrics(2.5)
     const priors = [
       fakeResult('p-old', 'right', dayIso(0), 2.0),
       fakeResult('p-newest', 'right', dayIso(20), null), // most recent, but null
     ]
-    const deltas = deltasVsPrevious(current, priors)
+    const deltas = deltasVsPrevious(currentReport(2.5), priors)
     expect(deltas.frequencyHz).toBeCloseTo(0.5, 10) // 2.5 - 2.0
   })
 
   it('returns null when every prior is null for that metric', () => {
-    const current = fakeMetrics(2.5)
     const priors = [fakeResult('p1', 'right', dayIso(0), null)]
-    expect(deltasVsPrevious(current, priors).frequencyHz).toBeNull()
+    expect(deltasVsPrevious(currentReport(2.5), priors).frequencyHz).toBeNull()
   })
 
   it('returns null when there are no priors at all', () => {
-    const current = fakeMetrics(2.5)
-    expect(deltasVsPrevious(current, []).frequencyHz).toBeNull()
+    expect(deltasVsPrevious(currentReport(2.5), []).frequencyHz).toBeNull()
   })
 })

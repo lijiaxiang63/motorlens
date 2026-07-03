@@ -1,12 +1,14 @@
-// Pure table of the ~12 headline cycle-test metrics, shared by every
-// analytics feature (asymmetry, trends, comparison) and, later, PDF
-// reporting — direction/format/getter logic exists exactly once here.
+// Pure metric catalogs shared by every analytics feature (asymmetry, trends,
+// comparison, delta chips) and PDF reporting — direction/format/getter logic
+// exists exactly once here. One catalog per test family; `catalogFor(testId)`
+// is the per-test entry point, and `metricValue(def, report)` is the single
+// family-checked place a getter meets a stored report's metrics.
 
-import { familyOfTest } from '../protocol/definitions'
+import { familyOfTest, testDefById, type TestFamily } from '../protocol/definitions'
 import { fmt } from '../ui/format'
 import type { CycleTestMetrics, SessionReport } from '../types'
 
-export type MetricKey =
+export type CycleMetricKey =
   | 'count'
   | 'frequencyHz'
   | 'amplitudeMean'
@@ -20,9 +22,15 @@ export type MetricKey =
   | 'hesitationCount'
   | 'itiMeanMs'
 
+/** Globally unique across families — tremor/ROM key unions join here with
+ *  their milestones, so thresholds and trend-route payloads never collide. */
+export type MetricKey = CycleMetricKey
+
 export type MetricDirection = 'higher-better' | 'lower-better' | 'neutral'
 
-export interface MetricDef {
+/** Getter-free metric descriptor — everything format/threshold/asymmetry
+ *  helpers need without binding to a family's metrics type. */
+export interface MetricInfo {
   key: MetricKey
   label: string
   digits: number
@@ -34,12 +42,20 @@ export interface MetricDef {
    *  (already percentages, or counts that can be ≈0) use a raw R−L
    *  difference instead — AI% is unstable near a zero denominator. */
   asymmetry: 'ratio' | 'points'
-  /** Member of the subject-hub sparkline grid (a curated subset, not all 12). */
+  /** Member of the subject-hub sparkline grid (a curated subset, not all). */
   spark: boolean
-  getter(m: CycleTestMetrics): number | null
+  /** Which test family this def's getter understands. */
+  family: TestFamily
 }
 
-export const METRIC_CATALOG: readonly MetricDef[] = [
+export interface MetricDef<M = CycleTestMetrics> extends MetricInfo {
+  getter(m: M): number | null
+}
+
+/** Union of every family's def type — widens as tremor/ROM catalogs land. */
+export type AnyMetricDef = MetricDef<CycleTestMetrics>
+
+export const METRIC_CATALOG: readonly MetricDef<CycleTestMetrics>[] = [
   {
     key: 'count',
     label: 'Events',
@@ -48,6 +64,7 @@ export const METRIC_CATALOG: readonly MetricDef[] = [
     direction: 'higher-better',
     asymmetry: 'ratio',
     spark: false,
+    family: 'cycle',
     getter: (m) => m.count,
   },
   {
@@ -58,6 +75,7 @@ export const METRIC_CATALOG: readonly MetricDef[] = [
     direction: 'higher-better',
     asymmetry: 'ratio',
     spark: true,
+    family: 'cycle',
     getter: (m) => m.frequencyHz,
   },
   {
@@ -68,6 +86,7 @@ export const METRIC_CATALOG: readonly MetricDef[] = [
     direction: 'higher-better',
     asymmetry: 'ratio',
     spark: true,
+    family: 'cycle',
     getter: (m) => m.amplitudeMean,
   },
   {
@@ -78,6 +97,7 @@ export const METRIC_CATALOG: readonly MetricDef[] = [
     direction: 'higher-better',
     asymmetry: 'ratio',
     spark: false,
+    family: 'cycle',
     getter: (m) => m.amplitudeMax,
   },
   {
@@ -88,6 +108,7 @@ export const METRIC_CATALOG: readonly MetricDef[] = [
     direction: 'higher-better',
     asymmetry: 'ratio',
     spark: false,
+    family: 'cycle',
     getter: (m) => m.closingVelMean,
   },
   {
@@ -98,6 +119,7 @@ export const METRIC_CATALOG: readonly MetricDef[] = [
     direction: 'higher-better',
     asymmetry: 'ratio',
     spark: false,
+    family: 'cycle',
     getter: (m) => m.closingVelPeak,
   },
   {
@@ -108,6 +130,7 @@ export const METRIC_CATALOG: readonly MetricDef[] = [
     direction: 'higher-better',
     asymmetry: 'ratio',
     spark: false,
+    family: 'cycle',
     getter: (m) => m.openingVelMean,
   },
   {
@@ -118,6 +141,7 @@ export const METRIC_CATALOG: readonly MetricDef[] = [
     direction: 'lower-better',
     asymmetry: 'points',
     spark: true,
+    family: 'cycle',
     getter: (m) => m.amplitudeDecrement.regressionPct,
   },
   {
@@ -128,6 +152,7 @@ export const METRIC_CATALOG: readonly MetricDef[] = [
     direction: 'lower-better',
     asymmetry: 'points',
     spark: false,
+    family: 'cycle',
     getter: (m) => m.velocityDecrement.regressionPct,
   },
   {
@@ -138,6 +163,7 @@ export const METRIC_CATALOG: readonly MetricDef[] = [
     direction: 'lower-better',
     asymmetry: 'points',
     spark: true,
+    family: 'cycle',
     getter: (m) => m.rhythm.itiCvPct,
   },
   {
@@ -150,6 +176,7 @@ export const METRIC_CATALOG: readonly MetricDef[] = [
     // near a zero denominator, so hesitations compare as a raw point diff.
     asymmetry: 'points',
     spark: false,
+    family: 'cycle',
     getter: (m) => m.rhythm.hesitationCount,
   },
   {
@@ -162,25 +189,105 @@ export const METRIC_CATALOG: readonly MetricDef[] = [
     direction: 'neutral',
     asymmetry: 'ratio',
     spark: false,
+    family: 'cycle',
     getter: (m) => m.rhythm.itiMeanMs,
   },
 ] as const
 
-export function metricByKey(key: MetricKey): MetricDef {
-  const def = METRIC_CATALOG.find((d) => d.key === key)
-  if (!def) throw new Error(`Unknown metric key: ${key}`)
-  return def
+/** Same keys/getters as METRIC_CATALOG with degree units — served by
+ *  catalogFor() for cycle tests whose signalKind is 'degrees'
+ *  (pronation-supination). Deliberately absent from metricByKey's global
+ *  search and the Settings cue editor: the keys are shared, only display
+ *  units differ. */
+const DEG_OVERRIDES: Partial<Record<CycleMetricKey, { digits: number; unit: string }>> = {
+  amplitudeMean: { digits: 0, unit: '°' },
+  amplitudeMax: { digits: 0, unit: '°' },
+  closingVelMean: { digits: 0, unit: ' °/s' },
+  closingVelPeak: { digits: 0, unit: ' °/s' },
+  openingVelMean: { digits: 0, unit: ' °/s' },
+}
+
+export const CYCLE_CATALOG_DEG: readonly MetricDef<CycleTestMetrics>[] = METRIC_CATALOG.map(
+  (def) => ({ ...def, ...(DEG_OVERRIDES[def.key as CycleMetricKey] ?? {}) }),
+)
+
+/** Cue-editor / global-lookup groups: one canonical catalog per family
+ *  (degree variants excluded — same keys). Extended as families land. */
+export const CATALOG_GROUPS: readonly {
+  family: TestFamily
+  title: string
+  defs: readonly AnyMetricDef[]
+}[] = [{ family: 'cycle', title: 'Cycle tests', defs: METRIC_CATALOG }]
+
+/** Curated headline subset across every family — the trend sparkline grid
+ *  and the subject report's per-hand "latest" cards share this set. */
+export const SPARK_KEYS: ReadonlySet<MetricKey> = new Set(
+  CATALOG_GROUPS.flatMap((g) => g.defs.filter((d) => d.spark).map((d) => d.key)),
+)
+
+/** The metric vocabulary for one test id: unit-correct defs whose getters
+ *  match that test's metrics shape. joint_monitor / unknown ids → []. */
+export function catalogFor(testId: string): readonly AnyMetricDef[] {
+  const def = testDefById(testId)
+  if (!def) return []
+  switch (def.family) {
+    case 'cycle':
+      return def.signalKind === 'degrees' ? CYCLE_CATALOG_DEG : METRIC_CATALOG
+  }
+}
+
+/** Global lookup across canonical catalogs (hand-unit cycle defs, later
+ *  tremor/ROM) — keys are unique across families, so no test context is
+ *  needed. Throws on unknown keys; old trend-route payloads and threshold
+ *  records always resolve. */
+export function metricByKey(key: MetricKey): AnyMetricDef {
+  for (const group of CATALOG_GROUPS) {
+    const def = group.defs.find((d) => d.key === key)
+    if (def) return def
+  }
+  throw new Error(`Unknown metric key: ${key}`)
+}
+
+/** Unit-correct variant: prefers the test's own catalog (degree units for
+ *  degree tests), falling back to the global lookup for keys outside it. */
+export function metricByKeyFor(testId: string, key: MetricKey): AnyMetricDef {
+  return catalogFor(testId).find((d) => d.key === key) ?? metricByKey(key)
+}
+
+/** Narrows a report's metrics to its family's shape, or null for
+ *  joint_monitor / unknown ids. Discriminates on the test id's family,
+ *  never on metric fields. Widens to a union as families land. */
+export function reportMetrics(report: SessionReport): CycleTestMetrics | null {
+  switch (familyOfTest(report.test)) {
+    case 'cycle':
+      return report.metrics as CycleTestMetrics
+    default:
+      return null
+  }
 }
 
 /** Narrows a report's metrics to CycleTestMetrics, or null for any other
- *  family (joint_monitor, tremor, ROM) — the single guard every analytics
- *  consumer routes through, so a non-cycle result can never reach a catalog
- *  getter. Discriminates on the test id's family, never on metric fields. */
+ *  family (joint_monitor, tremor, ROM) — the guard every cycle-only consumer
+ *  routes through, so a non-cycle result can never reach a cycle getter. */
 export function cycleMetricsOf(report: SessionReport): CycleTestMetrics | null {
   return familyOfTest(report.test) === 'cycle' ? (report.metrics as CycleTestMetrics) : null
 }
 
-export function formatMetric(def: MetricDef, v: number | null): string {
+/** Applies a getter to a metrics object the CALLER guarantees matches the
+ *  def's family — the one sanctioned cast. Prefer metricValue(), which
+ *  checks the family itself. */
+export function metricValueOf(def: AnyMetricDef, metrics: SessionReport['metrics']): number | null {
+  return (def.getter as (m: SessionReport['metrics']) => number | null)(metrics)
+}
+
+/** The single family-checked place a catalog getter meets a report:
+ *  null whenever the report's family doesn't match the def's. */
+export function metricValue(def: AnyMetricDef, report: SessionReport): number | null {
+  if (familyOfTest(report.test) !== def.family) return null
+  return metricValueOf(def, report.metrics)
+}
+
+export function formatMetric(def: Pick<MetricInfo, 'digits' | 'unit'>, v: number | null): string {
   return fmt(v, def.digits, def.unit)
 }
 
@@ -192,7 +299,10 @@ export function roundsToZero(delta: number, digits: number): boolean {
 }
 
 /** Signed delta with an explicit +/− sign (fmt() only signs negatives). */
-export function formatDelta(def: MetricDef, delta: number | null): string {
+export function formatDelta(
+  def: Pick<MetricInfo, 'digits' | 'unit'>,
+  delta: number | null,
+): string {
   if (delta == null || !Number.isFinite(delta)) return '—'
   const zero = roundsToZero(delta, def.digits)
   const sign = zero ? '±' : delta > 0 ? '+' : '−'
@@ -203,7 +313,7 @@ export function formatDelta(def: MetricDef, delta: number | null): string {
  *  the metric's direction (a "lower is better" metric going down is good).
  *  Null delta (no prior to compare to) yields null, not a chip. */
 export function deltaTone(
-  def: MetricDef,
+  def: Pick<MetricInfo, 'digits' | 'direction'>,
   delta: number | null,
 ): 'good' | 'bad' | 'neutral' | null {
   if (delta == null || !Number.isFinite(delta)) return null

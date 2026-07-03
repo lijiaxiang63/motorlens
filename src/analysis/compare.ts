@@ -3,9 +3,16 @@
 // results are the same test (comparing a tap signal against a fist signal
 // has no shared meaning, so those charts are disabled rather than faked).
 
+import { familyOfTest } from '../protocol/definitions'
 import type { StoredResult } from '../store/subjects'
 import type { Series } from '../types'
-import { METRIC_CATALOG, cycleMetricsOf, type MetricDirection, type MetricKey } from './metricCatalog'
+import {
+  catalogFor,
+  metricValue,
+  type AnyMetricDef,
+  type MetricDirection,
+  type MetricKey,
+} from './metricCatalog'
 
 export interface CompareRow {
   key: MetricKey
@@ -36,15 +43,22 @@ function rebase(series: Series): Series {
 }
 
 /** `a`/`b` are compared as-is (b − a) — callers order them (e.g. older vs
- *  newer by startedAt) since "which one is baseline" is a caller decision. */
+ *  newer by startedAt) since "which one is baseline" is a caller decision.
+ *  Rows span the union of both tests' catalogs (deduped by key, A's units
+ *  win) — a cross-family compare degrades to one-sided-null rows, never
+ *  crashes. The per-event amplitude overlay is cycle-only: other families
+ *  store no events, and an empty overlay would be noise, not data. */
 export function buildCompare(a: StoredResult, b: StoredResult): CompareData {
   const sameTest = a.testId === b.testId
-  const ma = cycleMetricsOf(a.report)
-  const mb = cycleMetricsOf(b.report)
 
-  const rows: CompareRow[] = METRIC_CATALOG.map((def) => {
-    const av = ma ? def.getter(ma) : null
-    const bv = mb ? def.getter(mb) : null
+  const catalog: AnyMetricDef[] = [...catalogFor(a.testId)]
+  for (const def of catalogFor(b.testId)) {
+    if (!catalog.some((d) => d.key === def.key)) catalog.push(def)
+  }
+
+  const rows: CompareRow[] = catalog.map((def) => {
+    const av = metricValue(def, a.report)
+    const bv = metricValue(def, b.report)
     return {
       key: def.key,
       label: def.label,
@@ -61,11 +75,12 @@ export function buildCompare(a: StoredResult, b: StoredResult): CompareData {
     sameTest,
     rows,
     signals: sameTest ? { a: rebase(a.report.series), b: rebase(b.report.series) } : null,
-    amplitudes: sameTest
-      ? {
-          a: a.report.events.map((e) => e.closingAmplitude),
-          b: b.report.events.map((e) => e.closingAmplitude),
-        }
-      : null,
+    amplitudes:
+      sameTest && familyOfTest(a.testId) === 'cycle'
+        ? {
+            a: a.report.events.map((e) => e.closingAmplitude),
+            b: b.report.events.map((e) => e.closingAmplitude),
+          }
+        : null,
   }
 }

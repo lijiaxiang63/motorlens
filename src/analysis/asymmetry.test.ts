@@ -4,7 +4,6 @@ import { makeTapFrames } from '../replay/synthetic'
 import type { StoredResult } from '../store/subjects'
 import type { CycleTestMetrics, Hand } from '../types'
 import { asymmetryForPair, computeAsymmetry, formatAsymmetryValue } from './asymmetry'
-import { metricByKey } from './metricCatalog'
 import { localDayKey, pairResults } from './pairing'
 
 function fakeMetrics(count: number): CycleTestMetrics {
@@ -101,7 +100,7 @@ describe('computeAsymmetry', () => {
   it('gives a positive frequency AI% for a faster right hand vs a slower left', () => {
     const right = computeTapMetrics(makeTapFrames({ freqHz: 2 }).frames).metrics
     const left = computeTapMetrics(makeTapFrames({ freqHz: 1.6 }).frames).metrics
-    const rows = computeAsymmetry(left, right)
+    const rows = computeAsymmetry('finger_tap', left, right)
     const freq = rows.find((r) => r.key === 'frequencyHz')!
     expect(freq.value).not.toBeNull()
     // 200 * (2 - 1.6) / 3.6 = 22.22%
@@ -110,7 +109,7 @@ describe('computeAsymmetry', () => {
 
   it('gives near-zero asymmetry on every metric for identical left/right runs', () => {
     const metrics = computeTapMetrics(makeTapFrames({ freqHz: 2, decrementPct: 10 }).frames).metrics
-    const rows = computeAsymmetry(metrics, metrics)
+    const rows = computeAsymmetry('finger_tap', metrics, metrics)
     for (const row of rows) {
       expect(row.value).not.toBeNull()
       expect(Number.isFinite(row.value!)).toBe(true)
@@ -120,7 +119,7 @@ describe('computeAsymmetry', () => {
 
   it('never produces NaN or Infinity when one side is missing', () => {
     const right = computeTapMetrics(makeTapFrames({ freqHz: 2 }).frames).metrics
-    const rows = computeAsymmetry(null, right)
+    const rows = computeAsymmetry('finger_tap', null, right)
     for (const row of rows) {
       expect(row.value).toBeNull()
       expect(row.left).toBeNull()
@@ -129,7 +128,7 @@ describe('computeAsymmetry', () => {
 
   it('does not divide by a near-zero denominator', () => {
     const zeroBoth = { ...fakeMetrics(0), amplitudeMean: 0 }
-    const rows = computeAsymmetry(zeroBoth, zeroBoth)
+    const rows = computeAsymmetry('finger_tap', zeroBoth, zeroBoth)
     const amp = rows.find((r) => r.key === 'amplitudeMean')!
     expect(amp.value).toBe(0)
     expect(Number.isFinite(amp.value!)).toBe(true)
@@ -160,32 +159,30 @@ describe('asymmetryForPair', () => {
 
 describe('formatAsymmetryValue', () => {
   it('signs ratio and points rows explicitly, using the metric own precision for points', () => {
-    const freq = metricByKey('frequencyHz')
-    const decrement = metricByKey('ampDecrementPct')
     expect(
-      formatAsymmetryValue(freq, {
-        key: 'frequencyHz', label: '', left: 1.6, right: 2, kind: 'ratio', direction: 'higher-better', value: 22.22,
+      formatAsymmetryValue({
+        key: 'frequencyHz', label: '', digits: 2, unit: ' Hz', left: 1.6, right: 2, kind: 'ratio', direction: 'higher-better', value: 22.22,
       }),
     ).toBe('+22%')
     expect(
-      formatAsymmetryValue(decrement, {
-        key: 'ampDecrementPct', label: '', left: 30, right: 10, kind: 'points', direction: 'lower-better', value: -20,
+      formatAsymmetryValue({
+        key: 'ampDecrementPct', label: '', digits: 0, unit: '%', left: 30, right: 10, kind: 'points', direction: 'lower-better', value: -20,
       }),
     ).toBe('−20 pts')
     expect(
-      formatAsymmetryValue(freq, {
-        key: 'frequencyHz', label: '', left: 2, right: 2, kind: 'ratio', direction: 'higher-better', value: 0,
+      formatAsymmetryValue({
+        key: 'frequencyHz', label: '', digits: 2, unit: ' Hz', left: 2, right: 2, kind: 'ratio', direction: 'higher-better', value: 0,
       }),
     ).toBe('±0%')
     expect(
-      formatAsymmetryValue(freq, {
-        key: 'frequencyHz', label: '', left: null, right: null, kind: 'ratio', direction: 'higher-better', value: null,
+      formatAsymmetryValue({
+        key: 'frequencyHz', label: '', digits: 2, unit: ' Hz', left: null, right: null, kind: 'ratio', direction: 'higher-better', value: null,
       }),
     ).toBe('—')
     // floating-point noise that rounds to zero reads as ± not a confusing "−0%"
     expect(
-      formatAsymmetryValue(freq, {
-        key: 'frequencyHz', label: '', left: 2, right: 2, kind: 'ratio', direction: 'higher-better', value: -1e-13,
+      formatAsymmetryValue({
+        key: 'frequencyHz', label: '', digits: 2, unit: ' Hz', left: 2, right: 2, kind: 'ratio', direction: 'higher-better', value: -1e-13,
       }),
     ).toBe('±0%')
   })

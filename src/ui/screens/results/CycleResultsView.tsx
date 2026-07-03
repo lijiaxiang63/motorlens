@@ -4,7 +4,12 @@
 // useResultSession; header/warnings/notes chrome in ResultHeader.
 
 import { useMemo } from 'react'
-import { deltaTone, formatDelta, metricByKey, type MetricKey } from '../../../analysis/metricCatalog'
+import {
+  deltaTone,
+  formatDelta,
+  metricByKeyFor,
+  type MetricKey,
+} from '../../../analysis/metricCatalog'
 import { evaluateThreshold } from '../../../analysis/thresholds'
 import { SignalChart, EventChart } from '../../charts/charts'
 import { MetricCard, type MetricDelta } from '../../components/MetricCard'
@@ -22,14 +27,15 @@ export function CycleResultsView({ result: r }: { result: ResultProps }) {
   function chipFor(key: MetricKey): MetricDelta | undefined {
     const delta = deltas?.[key]
     if (delta == null) return undefined
-    const chipDef = metricByKey(key)
+    // Unit-correct def for this test (degree tests format chips in °).
+    const chipDef = metricByKeyFor(def.id, key)
     const tone = deltaTone(chipDef, delta)
     if (!tone) return undefined
     return { text: formatDelta(chipDef, delta), tone }
   }
 
   function flaggedTone(key: MetricKey): 'warn' | undefined {
-    const value = metricByKey(key).getter(m)
+    const value = metricByKeyFor(def.id, key).getter(m)
     return evaluateThreshold(thresholds[key], value) ? 'warn' : undefined
   }
 

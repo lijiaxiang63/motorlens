@@ -4,7 +4,7 @@
 
 import type { StoredResult } from '../store/subjects'
 import type { TestId } from '../types'
-import { cycleMetricsOf } from './metricCatalog'
+import { reportMetrics } from './metricCatalog'
 
 export interface HandPair {
   dayKey: string
@@ -24,15 +24,15 @@ export function localDayKey(iso: string): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
-/** One pair per local day that has ≥1 cycle-metrics result for `testId`,
+/** One pair per local day that has ≥1 catalog-metrics result for `testId`,
  *  newest day first. Each side is the latest (max `startedAt`) result for
  *  that hand that day — a newer same-day result on one side replaces an
- *  older one. Results without cycle metrics (e.g. joint_monitor) are
+ *  older one. Results without catalog metrics (e.g. joint_monitor) are
  *  excluded, never crash the grouping. */
 export function pairResults(results: StoredResult[], testId: TestId): HandPair[] {
   const byDay = new Map<string, { left: StoredResult | null; right: StoredResult | null }>()
   for (const r of results) {
-    if (r.testId !== testId || cycleMetricsOf(r.report) === null) continue
+    if (r.testId !== testId || reportMetrics(r.report) === null) continue
     const dayKey = localDayKey(r.startedAt)
     const entry = byDay.get(dayKey) ?? { left: null, right: null }
     const slot = r.hand === 'left' ? 'left' : 'right'

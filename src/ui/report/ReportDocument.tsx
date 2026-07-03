@@ -7,7 +7,7 @@
 // app's current theme.
 
 import { formatAsymmetryValue, type AsymmetryRow } from '../../analysis/asymmetry'
-import { METRIC_CATALOG, metricByKey } from '../../analysis/metricCatalog'
+import { SPARK_KEYS } from '../../analysis/metricCatalog'
 import type {
   ReportMetricRow,
   SessionReportModel,
@@ -15,10 +15,9 @@ import type {
 } from '../../report/clinical'
 import { Sparkline } from '../components/Sparkline'
 
-/** The subject summary's per-hand "latest" card shows only the curated
- *  headline subset (the same `spark` metrics the trend sparkline grid uses)
- *  — the full 12-metric breakdown lives in the per-session report. */
-const SPARK_KEYS = new Set(METRIC_CATALOG.filter((d) => d.spark).map((d) => d.key))
+// The subject summary's per-hand "latest" card shows only the curated
+// headline subset (metricCatalog's SPARK_KEYS, shared with the trend
+// sparkline grid) — the full metric breakdown lives in the per-session report.
 
 function SectionTitle({ children }: { children: string }) {
   return (
@@ -81,13 +80,12 @@ function Disclaimer({ text }: { text: string }) {
 }
 
 function AsymmetryBarRow({ row }: { row: AsymmetryRow }) {
-  const def = metricByKey(row.key)
   const denom = Math.max(Math.abs(row.left ?? 0), Math.abs(row.right ?? 0), 1e-9)
   const leftPct = row.left !== null ? (Math.abs(row.left) / denom) * 100 : 0
   const rightPct = row.right !== null ? (Math.abs(row.right) / denom) * 100 : 0
   return (
     <div className="grid grid-cols-[130px_1fr_70px] items-center gap-2 py-1 text-[12px]">
-      <span className="truncate text-muted-foreground">{def.label}</span>
+      <span className="truncate text-muted-foreground">{row.label}</span>
       <div className="flex h-3 items-center">
         <div className="flex flex-1 justify-end">
           {row.left !== null && (
@@ -102,7 +100,7 @@ function AsymmetryBarRow({ row }: { row: AsymmetryRow }) {
         </div>
       </div>
       <span className="text-right tabular-nums text-muted-foreground">
-        {row.value === null ? '—' : formatAsymmetryValue(def, row)}
+        {row.value === null ? '—' : formatAsymmetryValue(row)}
       </span>
     </div>
   )
