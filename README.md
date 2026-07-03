@@ -21,6 +21,9 @@ speed, amplitude decrement, rhythm variability, and per-joint flexion angles.
 |---|---|---|
 | **Finger Tapping** (10 s/hand) | Tap index fingertip against thumb tip, as big and fast as possible | Tap count, frequency, amplitude, opening/closing speed, amplitude & velocity decrement, rhythm CV, hesitations |
 | **Fist Open–Close** (10 s/hand) | Open the hand fully, clench into a fist, repeat | Cycle count, frequency, aperture amplitude, clench/open speed, decrement, rhythm |
+| **Pronation–Supination** (10 s/hand) | Rotate the palm toward/away from the camera, elbow on the table | Turn count, frequency, rotation amplitude in degrees, pronation/supination speed, decrement, rhythm |
+| **Range of Motion** (10 s/hand) | Slowly open the hand flat, then curl into a full fist, repeatedly | Per-joint and per-finger ROM (°), total active ROM, peak angular velocity |
+| **Postural / Rest Tremor** (15 s/hand) | Hold the hand outstretched (postural) or fully relaxed (rest) | Dominant tremor frequency (3–12 Hz), RMS & peak displacement in cm, tremor index, per-axis share |
 | **Joint Monitor** (live) | Move freely | Flexion angle, min/max, range of motion, and peak angular velocity for all 15 finger joints |
 
 Each timed test runs: positioning check (hand visible, correct hand, good
@@ -172,8 +175,12 @@ palm length; `S` in cm gives the secondary `≈ cm` values (typical adult
 | Closing/opening speed | Peak signal slope between peak↔valley, hand units/s |
 | Decrement | Linear-regression decline across events as % of starting value (positive = fatiguing); a first-third vs last-third comparison is reported alongside |
 | Rhythm variability | Coefficient of variation of inter-event intervals |
-| Hesitation | Interval > max(2 × median interval, 0.4 s tap / 0.7 s fist) |
+| Hesitation | Interval > max(2 × median interval, 0.4 s tap / 0.7 s fist & pron-sup) |
+| Signal (pron-sup) | Palm-roll angle in degrees from the world-landmark palm normal, unwrapped — no hand-scale normalization (rotation is scale-free) |
 | Joint flexion | 180° − interior angle at the joint from 3-D world landmarks (0° = straight) |
+| Total active ROM | Sum of the 15 per-joint flexion ranges over the timed recording, ° |
+| Tremor displacement | Image-space palm-centroid motion converted to cm (world landmarks are hand-centered and cannot see whole-hand translation), detrended per tracking run |
+| Tremor frequency / index | Dominant bin of the Welch power spectrum in the 3–12 Hz band; index = % of 0.5–15 Hz power inside that band |
 
 Recording quality (fps, % frames with a detected hand, camera-distance
 variation) is reported with every result, with warnings when it may
@@ -190,9 +197,10 @@ http://localhost:5173/?source=synthetic&preset=tap-2hz&speed=4
 ```
 
 Presets: `tap-2hz`, `tap-decrement`, `tap-hesitant`, `tap-slow`,
-`fist-1p5hz`, `angles-sweep`. `speed` accelerates playback without changing
-the measured values. Dropping an exported session JSON onto the home screen
-re-analyzes its raw frames and reproduces the original results.
+`fist-1p5hz`, `pronosup-1hz`, `rom-sweep-timed`, `tremor-5hz`,
+`angles-sweep`. `speed` accelerates playback without changing the measured
+values. Dropping an exported session JSON onto the home screen re-analyzes
+its raw frames and reproduces the original results.
 
 ## Testing
 

@@ -82,10 +82,16 @@ try {
       await page.waitFor('!!window.__lastReport', { timeout: 120_000, interval: 250 })
       const report = await page.eval('JSON.stringify(window.__lastReport)')
       const m = JSON.parse(report).metrics
-      console.log(
-        `electron ${preset}: count=${m.count} freq=${m.frequencyHz?.toFixed(2)}Hz ` +
-          `decrement=${m.amplitudeDecrement?.regressionPct?.toFixed(1)}%`,
-      )
+      const summary =
+        typeof m.count === 'number'
+          ? `count=${m.count} freq=${m.frequencyHz?.toFixed(2)}Hz ` +
+            `decrement=${m.amplitudeDecrement?.regressionPct?.toFixed(1)}%`
+          : m.totalActiveRomDeg !== undefined
+            ? `totalROM=${m.totalActiveRomDeg?.toFixed(0)}deg`
+            : m.dominantFreqHz !== undefined
+              ? `tremor=${m.dominantFreqHz?.toFixed(1)}Hz rms=${m.rmsAmplitudeCm?.toFixed(2)}cm`
+              : 'metrics=non-cycle'
+      console.log(`electron ${preset}: ${summary}`)
       if (outDir) writeFileSync(join(outDir, `${preset}.json`), report)
     } catch (err) {
       failed++
