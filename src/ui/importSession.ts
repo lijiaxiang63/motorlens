@@ -7,6 +7,7 @@ import { testDefById } from '../protocol/definitions'
 import { createReplaySource } from '../replay/replaySource'
 import { parseSessionJson } from '../report/export'
 import type { AppContext } from './nav'
+import { buildResultProps } from './resultProps'
 
 /** Returns null on success, or a user-facing error message. */
 export async function importSessionFile(ctx: AppContext, file: File): Promise<string | null> {
@@ -16,14 +17,11 @@ export async function importSessionFile(ctx: AppContext, file: File): Promise<st
     if (def) {
       ctx.navigate({
         name: 'results',
-        result: {
-          def,
+        result: buildResultProps(def, report.raw.frames, {
           hand: report.hand,
-          analysis: def.compute(report.raw.frames),
-          frames: report.raw.frames,
           startedAt: report.startedAt,
           ...(report.notes ? { notes: report.notes } : {}),
-        },
+        }),
       })
       return null
     }

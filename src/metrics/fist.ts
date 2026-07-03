@@ -6,10 +6,10 @@ import {
 } from '../config'
 import type { CycleAnalysis, LandmarkFrame } from '../types'
 import { analyzeCycleTest, type CycleTestParams } from './cycleTest'
-import { apertureRaw } from './kinematics'
+import { apertureRaw, extractSignal } from './kinematics'
 
 export const FIST_PARAMS: CycleTestParams = {
-  raw: apertureRaw,
+  extract: (frames) => extractSignal(frames, apertureRaw),
   fcHz: FIST_FC_HZ,
   promFloor: FIST_PROM_FLOOR,
   minDistanceMs: FIST_MIN_DIST_MS,

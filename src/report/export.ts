@@ -5,13 +5,13 @@
 import { APP_VERSION } from '../config'
 import { savePlatformFile } from '../platform'
 import type {
-  CycleAnalysis,
   Hand,
   JointSummaries,
   LandmarkFrame,
   ReportSource,
   ReportSubject,
   SessionReport,
+  TestAnalysis,
   TestId,
   Vec3,
 } from '../types'
@@ -33,7 +33,7 @@ export function buildSessionReport(args: {
   hand: Hand
   startedAt: string
   durationMs: number
-  analysis: CycleAnalysis | null
+  analysis: TestAnalysis | null
   jointSummaries?: JointSummaries
   frames: LandmarkFrame[]
   subject?: ReportSubject

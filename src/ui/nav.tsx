@@ -17,7 +17,7 @@ import {
   type ReactNode,
 } from 'react'
 import type { MetricKey } from '../analysis/metricCatalog'
-import type { TestDefinition } from '../protocol/definitions'
+import type { CycleTestDefinition, TestDefinition } from '../protocol/definitions'
 import type { Subject } from '../store/subjects'
 import type { CycleAnalysis, FrameSource, Hand, LandmarkFrame, ReportSource, TestId } from '../types'
 
@@ -28,10 +28,11 @@ export interface SubjectTestContext {
   saveVideo: boolean
 }
 
-export interface ResultProps {
-  def: TestDefinition
+/** Family-agnostic result payload fields. `ResultProps` correlates these
+ *  with a matching def/analysis pair per test family — build instances via
+ *  buildResultProps (ui/resultProps.ts), never by hand-pairing. */
+export interface ResultCommon {
   hand: Hand
-  analysis: CycleAnalysis
   frames: LandmarkFrame[]
   startedAt: string
   /** Video segments differ from def.durationMs; absent = def.durationMs. */
@@ -45,6 +46,8 @@ export interface ResultProps {
   /** Seeds the notes editor when reopening a stored/imported result. */
   notes?: string
 }
+
+export type ResultProps = ResultCommon & { def: CycleTestDefinition; analysis: CycleAnalysis }
 
 export type ScreenRequest =
   | { name: 'home' }

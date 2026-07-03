@@ -2,6 +2,7 @@
 // the column layout is locked down by unit tests. Excel-friendly output:
 // UTF-8 BOM, CRLF line endings, RFC 4180 quoting.
 
+import { familyOfTest } from '../protocol/definitions'
 import type { Subject, StoredResult } from '../store/subjects'
 import type { CycleTestMetrics } from '../types'
 
@@ -58,10 +59,6 @@ function cell(x: unknown): string {
   return String(x)
 }
 
-function isCycleMetrics(m: StoredResult['report']['metrics']): m is CycleTestMetrics {
-  return typeof (m as CycleTestMetrics).count === 'number'
-}
-
 /** videoFile/reportFile are ZIP-relative paths ('' when absent). */
 export function buildSummaryRow(
   subject: Subject,
@@ -70,7 +67,9 @@ export function buildSummaryRow(
   reportFile: string,
 ): string[] {
   const rep = result.report
-  const m = isCycleMetrics(rep.metrics) ? rep.metrics : null
+  // Family discrimination by test id — non-cycle rows (joint_monitor, and
+  // later tremor/ROM) leave the cycle metric columns blank.
+  const m = familyOfTest(result.testId) === 'cycle' ? (rep.metrics as CycleTestMetrics) : null
   const q = rep.quality
   return [
     cell(subject.code),

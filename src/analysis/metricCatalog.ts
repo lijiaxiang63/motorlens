@@ -2,6 +2,7 @@
 // analytics feature (asymmetry, trends, comparison) and, later, PDF
 // reporting — direction/format/getter logic exists exactly once here.
 
+import { familyOfTest } from '../protocol/definitions'
 import { fmt } from '../ui/format'
 import type { CycleTestMetrics, SessionReport } from '../types'
 
@@ -171,13 +172,12 @@ export function metricByKey(key: MetricKey): MetricDef {
   return def
 }
 
-/** Narrows a report's metrics to CycleTestMetrics, or null for JointSummaries
- *  (joint_monitor) reports — the single guard every analytics consumer routes
- *  through, so a stray joint result can never reach a catalog getter. Mirrors
- *  csv.ts's isCycleMetrics check. */
+/** Narrows a report's metrics to CycleTestMetrics, or null for any other
+ *  family (joint_monitor, tremor, ROM) — the single guard every analytics
+ *  consumer routes through, so a non-cycle result can never reach a catalog
+ *  getter. Discriminates on the test id's family, never on metric fields. */
 export function cycleMetricsOf(report: SessionReport): CycleTestMetrics | null {
-  const m = report.metrics as CycleTestMetrics
-  return typeof m?.count === 'number' ? m : null
+  return familyOfTest(report.test) === 'cycle' ? (report.metrics as CycleTestMetrics) : null
 }
 
 export function formatMetric(def: MetricDef, v: number | null): string {

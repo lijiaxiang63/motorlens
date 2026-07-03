@@ -25,6 +25,7 @@ import { Button } from '../components/ui/button'
 import { PageHeader } from '../components/PageHeader'
 import { useNav, type SubjectTestContext } from '../nav'
 import { PreviewPanel } from '../PreviewPanel'
+import { buildResultProps } from '../resultProps'
 
 const ISSUE_TEXT: Record<PositioningIssue, string> = {
   warming_up: 'Looking for your hand…',
@@ -72,8 +73,11 @@ export function RecordScreen({
       session.onFrame(f)
       if (f.handedness) lastDetectedHandRef.current = f.handedness
       if (f.world) {
+        // 'hand' signals normalize by hand scale; 'degrees' signals plot raw
+        // (wrapped) angle values — scale division would be meaningless there.
         const scale = scaler.push(worldHandScale(f.world))
-        chartRef.current?.push(f.t, ema.push(f.t, def.rawSignal(f.world) / scale))
+        const raw = def.rawSignal(f.world)
+        chartRef.current?.push(f.t, ema.push(f.t, def.signalKind === 'hand' ? raw / scale : raw))
       }
     })
 
@@ -109,11 +113,8 @@ export function RecordScreen({
             const video = rec ? await rec.stop() : null
             navigate({
               name: 'results',
-              result: {
-                def,
+              result: buildResultProps(def, frames, {
                 hand,
-                analysis: def.compute(frames),
-                frames,
                 startedAt: startedAtRef.current,
                 ...(subjectCtx
                   ? {
@@ -123,7 +124,7 @@ export function RecordScreen({
                       videoCaptureFailed: wantVideo && !video,
                     }
                   : {}),
-              },
+              }),
             })
           })()
           break

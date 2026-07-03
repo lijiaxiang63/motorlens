@@ -15,7 +15,8 @@ import {
   type StoredResult,
   type Subject,
 } from '../../store/subjects'
-import type { CycleTestMetrics, Hand } from '../../types'
+import { cycleMetricsOf } from '../../analysis/metricCatalog'
+import type { Hand } from '../../types'
 import { Button } from '../components/ui/button'
 import { Card, CardDescription, CardFooter, CardTitle } from '../components/ui/card'
 import { CheckboxRow } from '../components/ui/field'
@@ -30,14 +31,9 @@ import { viewStoredResult } from '../viewResult'
 
 const HANDS: readonly Hand[] = ['left', 'right']
 
-function cycleMetrics(r: StoredResult): CycleTestMetrics | null {
-  const m = r.report.metrics as CycleTestMetrics
-  return typeof m.count === 'number' ? m : null
-}
-
 function metricsSnippet(r: StoredResult): string {
   const def = testDefById(r.testId)
-  const m = cycleMetrics(r)
+  const m = cycleMetricsOf(r.report)
   if (!def || !m) return ''
   return `${m.count} ${def.eventNoun[1]} · ${fmt(m.frequencyHz, 2)} Hz`
 }
@@ -294,7 +290,7 @@ export function SubjectScreen({ subjectId, notice }: { subjectId: string; notice
         <div className="flex flex-col gap-2.5">
           {results.map((r) => {
             const def = testDefById(r.testId)
-            const comparable = cycleMetrics(r) !== null
+            const comparable = cycleMetricsOf(r.report) !== null
             const isSelected = selectedForCompare.has(r.id)
             return (
               <div

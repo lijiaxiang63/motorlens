@@ -126,6 +126,12 @@ export interface CycleAnalysis {
   quality: QualityMetrics
 }
 
+/** Union of every test family's analysis bundle. Each family carries the
+ *  same four top-level members (metrics/signal/events/quality) so
+ *  buildSessionReport stays a single non-branching path — tremor and ROM
+ *  arms join this union with their milestones. */
+export type TestAnalysis = CycleAnalysis
+
 // ---------------------------------------------------------------------------
 // Joints
 

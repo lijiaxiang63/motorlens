@@ -6,10 +6,10 @@ import {
 } from '../config'
 import type { CycleAnalysis, LandmarkFrame } from '../types'
 import { analyzeCycleTest, type CycleTestParams } from './cycleTest'
-import { tapRaw } from './kinematics'
+import { extractSignal, tapRaw } from './kinematics'
 
 export const TAP_PARAMS: CycleTestParams = {
-  raw: tapRaw,
+  extract: (frames) => extractSignal(frames, tapRaw),
   fcHz: TAP_FC_HZ,
   promFloor: TAP_PROM_FLOOR,
   minDistanceMs: TAP_MIN_DIST_MS,

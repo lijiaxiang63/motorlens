@@ -6,6 +6,7 @@
 import { testDefById } from '../protocol/definitions'
 import type { StoredResult, Subject } from '../store/subjects'
 import type { ScreenRequest } from './nav'
+import { buildResultProps } from './resultProps'
 
 /** Returns false (no navigation) when the result's testId has no
  *  TestDefinition — e.g. a joint_monitor row, which has no results screen. */
@@ -16,21 +17,17 @@ export function viewStoredResult(
 ): boolean {
   const def = testDefById(r.testId)
   if (!def) return false
-  const frames = r.report.raw.frames
   navigate({
     name: 'results',
-    result: {
-      def,
+    result: buildResultProps(def, r.report.raw.frames, {
       hand: r.hand,
-      analysis: def.compute(frames),
-      frames,
       startedAt: r.startedAt,
       durationMs: r.report.durationMs,
       subject,
       ...(r.report.source ? { source: r.report.source } : {}),
       ...(r.report.notes ? { notes: r.report.notes } : {}),
       savedResultId: r.id,
-    },
+    }),
   })
   return true
 }

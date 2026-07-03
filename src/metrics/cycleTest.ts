@@ -12,15 +12,17 @@ import type {
   LandmarkFrame,
   QualityMetrics,
   Series,
-  Vec3,
 } from '../types'
 import { extractCycles } from './cycles'
 import { computeDecrement } from './decrement'
-import { extractSignal, splitSeries } from './kinematics'
+import { splitSeries, type ExtractedSignal } from './kinematics'
 import { computeRhythm } from './rhythm'
 
 export interface CycleTestParams {
-  raw: (world: Vec3[]) => number
+  /** frames → normalized signal series. Tap/fist wrap the hand-unit
+   *  extractSignal; angle tests (pronation-supination) supply their own
+   *  degree-valued extractor with cmPerUnit null. */
+  extract: (frames: LandmarkFrame[]) => ExtractedSignal
   fcHz: number
   promFloor: number
   minDistanceMs: number
@@ -28,7 +30,7 @@ export interface CycleTestParams {
 }
 
 export function analyzeCycleTest(frames: LandmarkFrame[], p: CycleTestParams): CycleAnalysis {
-  const { series, rawScales, cmPerUnit } = extractSignal(frames, p.raw)
+  const { series, rawScales, cmPerUnit } = p.extract(frames)
   const segments = splitSeries(series, MAX_GAP_MS)
   const smooth = segments.map((seg) => ({
     t: seg.t,
