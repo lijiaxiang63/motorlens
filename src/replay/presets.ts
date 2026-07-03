@@ -1,6 +1,8 @@
 // Named synthetic scenarios, selectable via ?source=synthetic&preset=<name>.
-// All run 16 s so a full positioning + countdown + 10 s recording fits
-// before the pattern loops (the record screen restarts playback on entry).
+// Each preset sizes its own loop so a full positioning + countdown +
+// recording fits before the pattern restarts (the record screen restarts
+// playback on entry): 16 s covers the 10 s tests; the 15 s tremor tests
+// need 24 s.
 
 import type { LandmarkFrame } from '../types'
 import {
@@ -9,6 +11,7 @@ import {
   makePronosupFrames,
   makeRomSweepFrames,
   makeTapFrames,
+  makeTremorFrames,
 } from './synthetic'
 
 export interface Preset {
@@ -17,7 +20,10 @@ export interface Preset {
   frames: LandmarkFrame[]
 }
 
+/** Positioning (~1 s) + countdown (3 s) + 10 s recording < 16 s. */
 const DURATION = 16_000
+/** Same setup + the 15 s tremor recording needs a longer loop. */
+const TREMOR_DURATION = 24_000
 
 function build(name: string): Preset | null {
   switch (name) {
@@ -77,6 +83,18 @@ function build(name: string): Preset | null {
         frames: makePronosupFrames({ durationMs: DURATION, freqHz: 1, noiseSd: 1.5, seed: 8 })
           .frames,
       }
+    case 'tremor-5hz':
+      return {
+        name,
+        description: 'Steady 5 Hz postural tremor, 0.8 cm peak displacement',
+        frames: makeTremorFrames({
+          durationMs: TREMOR_DURATION,
+          freqHz: 5,
+          ampCm: 0.8,
+          noiseSdCm: 0.02,
+          seed: 9,
+        }).frames,
+      }
     case 'rom-sweep-timed':
       return {
         name,
@@ -124,6 +142,7 @@ export const PRESET_NAMES = [
   'fist-1p5hz',
   'pronosup-1hz',
   'rom-sweep-timed',
+  'tremor-5hz',
   'angles-sweep',
 ] as const
 

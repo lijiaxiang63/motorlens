@@ -5,7 +5,8 @@ import {
 } from '../analysis/thresholds'
 import { computeRomMetrics } from '../metrics/rom'
 import { computeTapMetrics } from '../metrics/taps'
-import { makeRomSweepFrames, makeTapFrames } from '../replay/synthetic'
+import { computeTremorMetrics } from '../metrics/tremor'
+import { makeRomSweepFrames, makeTapFrames, makeTremorFrames } from '../replay/synthetic'
 import type { Subject, StoredResult } from '../store/subjects'
 import type { Hand } from '../types'
 import { buildSessionReportModel, buildSubjectReportModel, REPORT_DISCLAIMER } from './clinical'
@@ -94,6 +95,28 @@ function makeRomResult(id: string, hand: Hand, startedAt: string): StoredResult 
     id,
     subjectId: subject.id,
     testId: 'rom_test',
+    hand,
+    source: 'live',
+    startedAt,
+    report,
+  }
+}
+
+function makeTremorResult(id: string, hand: Hand, startedAt: string): StoredResult {
+  const durationMs = 15_000
+  const { frames } = makeTremorFrames({ durationMs })
+  const report = buildSessionReport({
+    test: 'tremor_postural',
+    hand,
+    startedAt,
+    durationMs,
+    analysis: computeTremorMetrics(frames),
+    frames,
+  })
+  return {
+    id,
+    subjectId: subject.id,
+    testId: 'tremor_postural',
     hand,
     source: 'live',
     startedAt,
@@ -259,6 +282,35 @@ describe('buildSessionReportModel', () => {
 
   it('building a ROM report never mutates the stored result', () => {
     const r = makeRomResult('rom1', 'right', dayIso(0))
+    const before = JSON.stringify(r)
+    buildSessionReportModel(r, subject, DEFAULT_REFERENCE_THRESHOLDS)
+    expect(JSON.stringify(r)).toBe(before)
+  })
+
+  it('builds a tremor-kind model with a PSD derived from the stored series', () => {
+    const r = makeTremorResult('t1', 'right', dayIso(0))
+    const model = buildSessionReportModel(r, subject, DEFAULT_REFERENCE_THRESHOLDS)!
+    expect(model.header.testTitle).toBe('Postural Tremor Test')
+    expect(model.metrics.map((m) => m.key)).toEqual([
+      'tremorDominantFreqHz',
+      'tremorRmsAmpCm',
+      'tremorPeakAmpCm',
+      'tremorIndexPct',
+      'tremorBandPower',
+    ])
+    const freq = model.metrics.find((m) => m.key === 'tremorDominantFreqHz')!
+    expect(freq.value).not.toBeNull()
+    expect(Math.abs(freq.value! - 5)).toBeLessThan(0.3)
+    if (model.charts.kind !== 'tremor') throw new Error('expected tremor charts')
+    expect(model.charts.displacement).toBe(r.report.series)
+    expect(model.charts.psd.freqHz.length).toBeGreaterThan(0)
+    expect(model.charts.bandHz).toEqual([3, 12])
+    // The cycle-only few-events warning must not fire for tremor.
+    expect(model.qualityWarnings.some((w) => w.includes('Very few events'))).toBe(false)
+  })
+
+  it('building a tremor report (incl. PSD derivation) never mutates the stored result', () => {
+    const r = makeTremorResult('t1', 'right', dayIso(0))
     const before = JSON.stringify(r)
     buildSessionReportModel(r, subject, DEFAULT_REFERENCE_THRESHOLDS)
     expect(JSON.stringify(r)).toBe(before)

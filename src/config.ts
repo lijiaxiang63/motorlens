@@ -103,6 +103,9 @@ export const FIST_LIVE_Y_RANGE: readonly [number, number] = [0, 2.6]
 export const PRONOSUP_LIVE_Y_RANGE: readonly [number, number] = [-180, 180]
 /** Live tremor chart plots centroid displacement vs a slow baseline, cm. */
 export const TREMOR_LIVE_Y_RANGE: readonly [number, number] = [-2, 2]
+/** Cutoff of the slow baseline the live tremor chart subtracts (display
+ *  only — the offline pipeline detrends per run instead). */
+export const TREMOR_LIVE_BASELINE_FC_HZ = 0.5
 
 // --- Subjects & local storage (IndexedDB) ---
 export const DB_NAME = 'motorlens'

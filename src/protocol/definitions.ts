@@ -18,13 +18,22 @@ import {
   TAP_FC_HZ,
   TAP_LIVE_Y_RANGE,
   TAP_TEST_MS,
+  TREMOR_TEST_MS,
 } from '../config'
 import { computeFistMetrics } from '../metrics/fist'
 import { apertureRaw, tapRaw } from '../metrics/kinematics'
 import { computePronosupMetrics, rollDeg } from '../metrics/pronosup'
 import { computeRomMetrics } from '../metrics/rom'
 import { computeTapMetrics } from '../metrics/taps'
-import type { CycleAnalysis, LandmarkFrame, RomAnalysis, TestId, Vec3 } from '../types'
+import { computeTremorMetrics } from '../metrics/tremor'
+import type {
+  CycleAnalysis,
+  LandmarkFrame,
+  RomAnalysis,
+  TestId,
+  TremorAnalysis,
+  Vec3,
+} from '../types'
 
 export type TestFamily = 'cycle' | 'tremor' | 'rom'
 
@@ -63,7 +72,12 @@ export interface RomTestDefinition extends TestDefinitionBase {
   compute(frames: LandmarkFrame[]): RomAnalysis
 }
 
-export type TestDefinition = CycleTestDefinition | RomTestDefinition
+export interface TremorTestDefinition extends TestDefinitionBase {
+  family: 'tremor'
+  compute(frames: LandmarkFrame[]): TremorAnalysis
+}
+
+export type TestDefinition = CycleTestDefinition | RomTestDefinition | TremorTestDefinition
 
 export const FINGER_TAP: TestDefinition = {
   id: 'finger_tap',
@@ -141,11 +155,42 @@ export const ROM_TEST: TestDefinition = {
   compute: computeRomMetrics,
 }
 
+// Tremor tests deliberately use only the standard positioning gates — no
+// stillness gate. Tremor patients could never pass one: the motion IS the
+// measurement, and quality metrics report tracking problems instead.
+export const TREMOR_POSTURAL: TestDefinition = {
+  id: 'tremor_postural',
+  family: 'tremor',
+  title: 'Postural Tremor Test',
+  description:
+    'Hold your arm outstretched with the hand open and fingers spread, keeping it as steady as you can.',
+  instructions:
+    'Stretch your arm out toward the camera with the palm open and fingers spread. Hold the position as steadily as possible until the timer ends — do not grip or move on purpose.',
+  durationMs: TREMOR_TEST_MS,
+  highlightLandmarks: [0, 5, 9, 13, 17],
+  compute: computeTremorMetrics,
+}
+
+export const TREMOR_REST: TestDefinition = {
+  id: 'tremor_rest',
+  family: 'tremor',
+  title: 'Rest Tremor Test',
+  description:
+    'Rest your hand completely — supported and relaxed — while the camera watches for involuntary movement.',
+  instructions:
+    'Rest your forearm on the table or armrest so the hand hangs fully relaxed in view of the camera. Let the hand go loose and keep it at rest until the timer ends.',
+  durationMs: TREMOR_TEST_MS,
+  highlightLandmarks: [0, 5, 9, 13, 17],
+  compute: computeTremorMetrics,
+}
+
 export const TEST_DEFS: TestDefinition[] = [
   FINGER_TAP,
   FIST_OPEN_CLOSE,
   PRONATION_SUPINATION,
   ROM_TEST,
+  TREMOR_POSTURAL,
+  TREMOR_REST,
 ]
 
 export function testDefById(id: string): TestDefinition | null {

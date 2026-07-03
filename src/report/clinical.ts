@@ -4,7 +4,8 @@
 // metrics/series/events are read straight off the stored report, so
 // generating a report can never mutate (or even touch) the stored result.
 
-import { APP_VERSION, HAND_SCALE_CV_WARN_PCT } from '../config'
+import { APP_VERSION, HAND_SCALE_CV_WARN_PCT, TREMOR_BAND_HZ, TREMOR_RESAMPLE_HZ } from '../config'
+import { resampleUniform, welchPsd } from '../signal/spectrum'
 import { familyOfTest, TEST_DEFS, testDefById } from '../protocol/definitions'
 import type { Subject, StoredResult } from '../store/subjects'
 import type {
@@ -19,6 +20,7 @@ import type {
   Series,
   SessionReport,
   TestId,
+  TremorMetrics,
 } from '../types'
 import { asymmetryForPair, type AsymmetryRow } from '../analysis/asymmetry'
 import {
@@ -83,6 +85,16 @@ export type SessionReportCharts =
       traceLabel: string
       perFinger: { finger: Finger; romDeg: number | null }[]
       joints: JointSummaries
+    }
+  | {
+      kind: 'tremor'
+      /** Dominant-axis detrended displacement (the stored report.series). */
+      displacement: Series
+      /** Welch PSD DERIVED from the stored displacement series (pure —
+       *  welchPsd/resampleUniform copy, never mutate; same precedent as the
+       *  cycle arm deriving amplitudes/intervals from stored events). */
+      psd: { freqHz: number[]; power: number[] }
+      bandHz: readonly [number, number]
     }
 
 export interface SessionReportModel {
@@ -199,11 +211,19 @@ function subjectLineFromReportSubject(s: ReportSubject): string | null {
 
 /** Per-family chart payload, read by reference off the stored report. */
 function buildCharts(
-  family: 'cycle' | 'rom',
+  family: 'cycle' | 'rom' | 'tremor',
   report: SessionReport,
   testId: TestId,
 ): SessionReportCharts {
   const def = testDefById(testId)
+  if (family === 'tremor') {
+    return {
+      kind: 'tremor',
+      displacement: report.series,
+      psd: welchPsd(resampleUniform(report.series, TREMOR_RESAMPLE_HZ), TREMOR_RESAMPLE_HZ),
+      bandHz: TREMOR_BAND_HZ,
+    }
+  }
   if (family === 'rom') {
     const m = report.metrics as RomMetrics
     return {
@@ -247,8 +267,7 @@ export function buildSessionReportModel(
 ): SessionReportModel | null {
   const report = result.report
   const family = familyOfTest(result.testId)
-  // The tremor charts arm lands with its milestone; joint_monitor has none.
-  if (family === null || family === 'tremor') return null
+  if (family === null) return null
   const cycleCount = family === 'cycle' ? (report.metrics as CycleTestMetrics).count : null
   const def = testDefById(result.testId)
 
@@ -337,6 +356,10 @@ function sessionSummary(r: StoredResult): string {
   if (family === 'rom') {
     const m = r.report.metrics as RomMetrics
     return `Total active ROM ${formatMetric(metricByKey('romTotalDeg'), m.totalActiveRomDeg)}`
+  }
+  if (family === 'tremor') {
+    const m = r.report.metrics as TremorMetrics
+    return `Tremor ${formatMetric(metricByKey('tremorDominantFreqHz'), m.dominantFreqHz)} · RMS ${formatMetric(metricByKey('tremorRmsAmpCm'), m.rmsAmplitudeCm)}`
   }
   return 'Joint range-of-motion session'
 }

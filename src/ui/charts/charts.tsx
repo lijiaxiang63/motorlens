@@ -12,6 +12,7 @@ import {
   createEventChart,
   createOverlayEventChart,
   createOverlaySignalChart,
+  createPsdChart,
   createSignalChart,
   createStreamChart,
   createTrendChart,
@@ -78,6 +79,28 @@ export function SignalChart({
     const c = createSignalChart(host.current!, series, events, yLabel, height)
     return () => c.destroy()
   }, [resolved, series, events, yLabel, height])
+  return <div ref={host} className={cn(panelClass, className)} />
+}
+
+export function PsdChart({
+  psd,
+  bandHz,
+  yLabel,
+  height,
+  className,
+}: {
+  psd: { freqHz: number[]; power: number[] }
+  bandHz: readonly [number, number]
+  yLabel: string
+  height?: number
+  className?: string
+}) {
+  const host = useRef<HTMLDivElement>(null)
+  const { resolved } = useTheme()
+  useEffect(() => {
+    const c = createPsdChart(host.current!, psd, bandHz, yLabel, { height })
+    return () => c.destroy()
+  }, [resolved, psd, bandHz, yLabel, height])
   return <div ref={host} className={cn(panelClass, className)} />
 }
 

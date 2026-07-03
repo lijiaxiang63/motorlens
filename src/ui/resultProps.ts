@@ -17,5 +17,7 @@ export function buildResultProps(
       return { ...common, frames, family: 'cycle', def, analysis: def.compute(frames) }
     case 'rom':
       return { ...common, frames, family: 'rom', def, analysis: def.compute(frames) }
+    case 'tremor':
+      return { ...common, frames, family: 'tremor', def, analysis: def.compute(frames) }
   }
 }

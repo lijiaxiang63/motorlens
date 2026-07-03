@@ -16,7 +16,7 @@ import {
   type Subject,
 } from '../../store/subjects'
 import { cycleMetricsOf } from '../../analysis/metricCatalog'
-import type { Hand, RomMetrics } from '../../types'
+import type { Hand, RomMetrics, TremorMetrics } from '../../types'
 import { Button } from '../components/ui/button'
 import { Card, CardDescription, CardFooter, CardTitle } from '../components/ui/card'
 import { CheckboxRow } from '../components/ui/field'
@@ -37,6 +37,11 @@ function metricsSnippet(r: StoredResult): string {
   if (def.family === 'rom') {
     const m = r.report.metrics as RomMetrics
     return m.totalActiveRomDeg !== null ? `ROM ${fmt(m.totalActiveRomDeg, 0)}°` : ''
+  }
+  if (def.family === 'tremor') {
+    const m = r.report.metrics as TremorMetrics
+    if (m.dominantFreqHz === null || m.rmsAmplitudeCm === null) return ''
+    return `${fmt(m.dominantFreqHz, 1)} Hz · RMS ${fmt(m.rmsAmplitudeCm, 2)} cm`
   }
   const m = cycleMetricsOf(r.report)
   if (!m) return ''

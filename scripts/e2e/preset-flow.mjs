@@ -30,6 +30,7 @@ const CARD_TITLES = [
   ['fist', 'Fist Open–Close Test'],
   ['pronosup', 'Pronation–Supination Test'],
   ['rom', 'Range of Motion Test'],
+  ['tremor', 'Postural Tremor Test'],
   ['tap', 'Finger Tapping Test'],
 ]
 const cardTitle = (preset) =>
@@ -60,7 +61,9 @@ try {
             `hesitations=${m.rhythm?.hesitationCount}`
           : m.totalActiveRomDeg !== undefined
             ? `totalROM=${m.totalActiveRomDeg?.toFixed(0)}deg`
-            : 'metrics=non-cycle'
+            : m.dominantFreqHz !== undefined
+              ? `tremor=${m.dominantFreqHz?.toFixed(1)}Hz rms=${m.rmsAmplitudeCm?.toFixed(2)}cm index=${m.tremorIndexPct?.toFixed(0)}%`
+              : 'metrics=non-cycle'
       console.log(
         `${preset}: ${summary} events=${r.events.length} frames=${r.raw.frames.length}`,
       )

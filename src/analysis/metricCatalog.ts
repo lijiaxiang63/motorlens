@@ -6,7 +6,7 @@
 
 import { familyOfTest, testDefById, type TestFamily } from '../protocol/definitions'
 import { fmt } from '../ui/format'
-import type { CycleTestMetrics, Finger, RomMetrics, SessionReport } from '../types'
+import type { CycleTestMetrics, Finger, RomMetrics, SessionReport, TremorMetrics } from '../types'
 
 export type CycleMetricKey =
   | 'count'
@@ -22,6 +22,13 @@ export type CycleMetricKey =
   | 'hesitationCount'
   | 'itiMeanMs'
 
+export type TremorMetricKey =
+  | 'tremorDominantFreqHz'
+  | 'tremorRmsAmpCm'
+  | 'tremorPeakAmpCm'
+  | 'tremorIndexPct'
+  | 'tremorBandPower'
+
 export type RomMetricKey =
   | 'romTotalDeg'
   | 'romThumbDeg'
@@ -30,9 +37,9 @@ export type RomMetricKey =
   | 'romRingDeg'
   | 'romPinkyDeg'
 
-/** Globally unique across families — the tremor key union joins here with
- *  its milestone, so thresholds and trend-route payloads never collide. */
-export type MetricKey = CycleMetricKey | RomMetricKey
+/** Globally unique across families, so thresholds and trend-route payloads
+ *  never collide. */
+export type MetricKey = CycleMetricKey | RomMetricKey | TremorMetricKey
 
 export type MetricDirection = 'higher-better' | 'lower-better' | 'neutral'
 
@@ -60,8 +67,11 @@ export interface MetricDef<M = CycleTestMetrics> extends MetricInfo {
   getter(m: M): number | null
 }
 
-/** Union of every family's def type — widens as the tremor catalog lands. */
-export type AnyMetricDef = MetricDef<CycleTestMetrics> | MetricDef<RomMetrics>
+/** Union of every family's def type. */
+export type AnyMetricDef =
+  | MetricDef<CycleTestMetrics>
+  | MetricDef<RomMetrics>
+  | MetricDef<TremorMetrics>
 
 export const METRIC_CATALOG: readonly MetricDef<CycleTestMetrics>[] = [
   {
@@ -250,6 +260,68 @@ export const ROM_CATALOG: readonly MetricDef<RomMetrics>[] = [
   romFingerDef('romPinkyDeg', 'pinky', 'Pinky ROM'),
 ] as const
 
+export const TREMOR_CATALOG: readonly MetricDef<TremorMetrics>[] = [
+  {
+    key: 'tremorDominantFreqHz',
+    label: 'Tremor frequency',
+    digits: 1,
+    unit: ' Hz',
+    // Frequency locates the tremor type (rest vs essential); neither
+    // direction is "better".
+    direction: 'neutral',
+    asymmetry: 'ratio',
+    spark: true,
+    family: 'tremor',
+    getter: (m) => m.dominantFreqHz,
+  },
+  {
+    key: 'tremorRmsAmpCm',
+    label: 'Tremor amplitude (RMS)',
+    digits: 2,
+    unit: ' cm',
+    direction: 'lower-better',
+    asymmetry: 'ratio',
+    spark: true,
+    family: 'tremor',
+    getter: (m) => m.rmsAmplitudeCm,
+  },
+  {
+    key: 'tremorPeakAmpCm',
+    label: 'Tremor amplitude (peak)',
+    digits: 2,
+    unit: ' cm',
+    direction: 'lower-better',
+    asymmetry: 'ratio',
+    spark: false,
+    family: 'tremor',
+    getter: (m) => m.peakAmplitudeCm,
+  },
+  {
+    key: 'tremorIndexPct',
+    label: 'Tremor index',
+    digits: 0,
+    unit: '%',
+    direction: 'lower-better',
+    // Already a bounded percentage that sits near zero for tremor-free
+    // hands — a raw point difference reads better than an unstable AI%.
+    asymmetry: 'points',
+    spark: true,
+    family: 'tremor',
+    getter: (m) => m.tremorIndexPct,
+  },
+  {
+    key: 'tremorBandPower',
+    label: 'Band power (3\u201312 Hz)',
+    digits: 3,
+    unit: ' cm\u00b2',
+    direction: 'lower-better',
+    asymmetry: 'ratio',
+    spark: false,
+    family: 'tremor',
+    getter: (m) => m.bandPowerCm2,
+  },
+] as const
+
 /** Cue-editor / global-lookup groups: one canonical catalog per family
  *  (degree variants excluded — same keys). Extended as families land. */
 export const CATALOG_GROUPS: readonly {
@@ -259,6 +331,7 @@ export const CATALOG_GROUPS: readonly {
 }[] = [
   { family: 'cycle', title: 'Cycle tests', defs: METRIC_CATALOG },
   { family: 'rom', title: 'Range of motion', defs: ROM_CATALOG },
+  { family: 'tremor', title: 'Tremor', defs: TREMOR_CATALOG },
 ]
 
 /** Curated headline subset across every family — the trend sparkline grid
@@ -277,6 +350,8 @@ export function catalogFor(testId: string): readonly AnyMetricDef[] {
       return def.signalKind === 'degrees' ? CYCLE_CATALOG_DEG : METRIC_CATALOG
     case 'rom':
       return ROM_CATALOG
+    case 'tremor':
+      return TREMOR_CATALOG
   }
 }
 
@@ -301,12 +376,16 @@ export function metricByKeyFor(testId: string, key: MetricKey): AnyMetricDef {
 /** Narrows a report's metrics to its family's shape, or null for
  *  joint_monitor / unknown ids. Discriminates on the test id's family,
  *  never on metric fields. Widens to a union as families land. */
-export function reportMetrics(report: SessionReport): CycleTestMetrics | RomMetrics | null {
+export function reportMetrics(
+  report: SessionReport,
+): CycleTestMetrics | RomMetrics | TremorMetrics | null {
   switch (familyOfTest(report.test)) {
     case 'cycle':
       return report.metrics as CycleTestMetrics
     case 'rom':
       return report.metrics as RomMetrics
+    case 'tremor':
+      return report.metrics as TremorMetrics
     default:
       return null
   }

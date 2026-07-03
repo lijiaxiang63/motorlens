@@ -14,9 +14,15 @@
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createTestRecorder, type TestRecorder } from '../../capture/videoRecorder'
-import { LIVE_CHART_WINDOW_MS, LIVE_COUNT_THROTTLE_MS } from '../../config'
+import {
+  LIVE_CHART_WINDOW_MS,
+  LIVE_COUNT_THROTTLE_MS,
+  TREMOR_LIVE_BASELINE_FC_HZ,
+  TREMOR_LIVE_Y_RANGE,
+} from '../../config'
 import { JOINT_IDS, JointTracker } from '../../metrics/angles'
-import { ScaleSmoother, worldHandScale } from '../../metrics/kinematics'
+import { rawHandScale, ScaleSmoother, worldHandScale } from '../../metrics/kinematics'
+import { TREMOR_CENTROID_LANDMARKS } from '../../metrics/tremor'
 import type { TestDefinition } from '../../protocol/definitions'
 import { TestSession, type Phase, type PositioningIssue } from '../../protocol/testSession'
 import { LiveEma } from '../../signal/filters'
@@ -84,7 +90,14 @@ export function RecordScreen({
   const wantVideo = subjectCtx?.saveVideo === true && source.kind === 'camera'
 
   useEffect(() => {
-    const ema = def.family === 'cycle' ? new LiveEma(def.fcHz) : null
+    // For cycle tests this smooths the signal itself; for tremor it tracks
+    // the SLOW baseline the displayed displacement is measured against.
+    const ema =
+      def.family === 'cycle'
+        ? new LiveEma(def.fcHz)
+        : def.family === 'tremor'
+          ? new LiveEma(TREMOR_LIVE_BASELINE_FC_HZ)
+          : null
     const scaler = new ScaleSmoother()
 
     const unsubFrames = source.subscribe((f) => {
@@ -97,7 +110,7 @@ export function RecordScreen({
         const scale = scaler.push(worldHandScale(f.world))
         const raw = def.rawSignal(f.world)
         chartRef.current?.push(f.t, ema!.push(f.t, def.signalKind === 'hand' ? raw / scale : raw))
-      } else {
+      } else if (def.family === 'rom') {
         const tracker = trackerRef.current!
         tracker.push(f)
         // Total flexion = sum of the smoothed per-joint currents.
@@ -107,6 +120,15 @@ export function RecordScreen({
           if (s.v.length > 0) sum += s.v[s.v.length - 1]!
         }
         chartRef.current?.push(f.t, sum)
+      } else if (f.landmarks) {
+        // Tremor: vertical centroid displacement vs the slow baseline, cm.
+        const rs = rawHandScale(f.landmarks, f.aspect)
+        if (rs < 1e-9) return
+        let cy = 0
+        for (const i of TREMOR_CENTROID_LANDMARKS) cy += f.landmarks[i]!.y
+        cy /= TREMOR_CENTROID_LANDMARKS.length
+        const cyCm = (cy * worldHandScale(f.world) * 100) / rs
+        chartRef.current?.push(f.t, cyCm - ema!.push(f.t, cyCm))
       }
     })
 
@@ -212,7 +234,7 @@ export function RecordScreen({
         <PreviewPanel highlight={def.highlightLandmarks} />
         <div className="flex min-w-0 flex-col gap-3">
           <StagePanel session={session} def={def} hand={hand} detectedRef={lastDetectedHandRef} />
-          {def.family === 'cycle' ? (
+          {def.family === 'cycle' && (
             <div className="rounded-xl border bg-surface px-2.5 py-4 text-center">
               <div
                 className="text-[64px] font-bold leading-none tabular-nums text-ok"
@@ -222,12 +244,21 @@ export function RecordScreen({
               </div>
               <div className="mt-1 text-xs text-muted-foreground">{def.eventNoun[1]}</div>
             </div>
-          ) : (
+          )}
+          {def.family === 'rom' && (
             <div className="rounded-xl border bg-surface px-2.5 py-4 text-center">
               <div className="text-[64px] font-bold leading-none tabular-nums text-ok">
                 {fmt(liveTotalRom, 0, '°')}
               </div>
               <div className="mt-1 text-xs text-muted-foreground">total active ROM</div>
+            </div>
+          )}
+          {def.family === 'tremor' && (
+            <div className="flex flex-col items-center justify-center gap-1 rounded-xl border bg-surface px-2.5 py-4 text-center">
+              <div className="text-[17px] font-semibold">Keep the hand as still as you can</div>
+              <div className="text-xs text-muted-foreground">
+                Involuntary movement is being measured — no counting needed
+              </div>
             </div>
           )}
         </div>
@@ -239,7 +270,13 @@ export function RecordScreen({
 
       <StreamChart
         ref={chartRef}
-        yRange={def.family === 'cycle' ? def.liveYRange : ROM_LIVE_Y_RANGE}
+        yRange={
+          def.family === 'cycle'
+            ? def.liveYRange
+            : def.family === 'tremor'
+              ? TREMOR_LIVE_Y_RANGE
+              : ROM_LIVE_Y_RANGE
+        }
         windowMs={LIVE_CHART_WINDOW_MS}
       />
     </div>

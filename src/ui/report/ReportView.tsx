@@ -22,7 +22,7 @@ import {
   getSubject,
   listResults,
 } from '../../store/subjects'
-import { createEventChart, createSignalChart } from '../charts/uplotCore'
+import { createEventChart, createPsdChart, createSignalChart } from '../charts/uplotCore'
 import { snapshotChart } from './chartSnapshots'
 import { SessionReportDocument, SubjectReportDocument } from './ReportDocument'
 import './report.css'
@@ -53,11 +53,18 @@ async function loadSession(
     pngs.amplitude = await snapshotChart((el, palette) =>
       createEventChart(el, charts.amplitudes, charts.amplitudeLabel, { trend: true, palette }),
     )
-  } else {
+  } else if (charts.kind === 'rom') {
     // rom: per-finger bars and the joint table render as print-safe HTML;
     // only the flexion trace needs a canvas snapshot.
     pngs.trace = await snapshotChart((el, palette) =>
       createSignalChart(el, charts.trace, [], charts.traceLabel, 220, palette),
+    )
+  } else {
+    pngs.psd = await snapshotChart((el, palette) =>
+      createPsdChart(el, charts.psd, charts.bandHz, 'power (cm²/Hz)', { palette }),
+    )
+    pngs.displacement = await snapshotChart((el, palette) =>
+      createSignalChart(el, charts.displacement, [], 'displacement (cm)', 220, palette),
     )
   }
   return { model, pngs }

@@ -232,6 +232,16 @@ export function SessionReportDocument({
         </>
       )}
 
+      {charts.kind === 'tremor' && (
+        <>
+          <SectionTitle>Power spectrum</SectionTitle>
+          <img src={pngs.psd} alt="Displacement power spectrum with the 3–12 Hz tremor band shaded" className="w-full rounded-lg border" style={{ breakInside: 'avoid' }} />
+
+          <SectionTitle>Displacement</SectionTitle>
+          <img src={pngs.displacement} alt="Detrended hand displacement over the recording" className="w-full rounded-lg border" style={{ breakInside: 'avoid' }} />
+        </>
+      )}
+
       {model.notes && (
         <>
           <SectionTitle>Notes</SectionTitle>

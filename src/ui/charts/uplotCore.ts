@@ -24,6 +24,8 @@ export interface ChartPalette {
    *  Doubles as the "A vs B" pair in result comparison. */
   left: string
   right: string
+  /** Translucent frequency-band shading (tremor PSD highlight). */
+  band: string
 }
 
 /** Read the current theme's chart tokens (call at chart creation; charts are
@@ -41,6 +43,7 @@ export function readChartPalette(el: Element = document.documentElement): ChartP
     grid: v('--chart-grid', 'rgba(139, 147, 167, 0.14)'),
     left: v('--chart-left', '#d95926'),
     right: v('--chart-right', '#3987e5'),
+    band: v('--chart-band', 'rgba(57, 135, 229, 0.1)'),
   }
 }
 
@@ -189,6 +192,47 @@ export function createSignalChart(
     },
   )
   const u = new uPlot(o, [xs, ys as never, markers as never], mount)
+  const unobserve = observeSize(el, mount, u, height)
+  return {
+    destroy() {
+      unobserve()
+      u.destroy()
+      mount.remove()
+    },
+  }
+}
+
+/** Power spectral density with a translucent shaded frequency band
+ *  (the 3–12 Hz tremor band). Palette-parameterized like every static
+ *  builder so report snapshots stay light-locked. */
+export function createPsdChart(
+  el: HTMLElement,
+  psd: { freqHz: number[]; power: number[] },
+  bandHz: readonly [number, number],
+  yLabel: string,
+  opts: { height?: number; palette?: ChartPalette } = {},
+): StaticChartCore {
+  const c = opts.palette ?? readChartPalette()
+  const height = opts.height ?? 220
+  const mount = makeMount(el)
+  const o = baseOpts(c, mount.clientWidth || 600, height)
+  o.axes = [axis(c, 'frequency (Hz)'), axis(c, yLabel)]
+  o.series.push({ stroke: c.line, width: 2, points: { show: false } })
+  o.hooks = {
+    drawClear: [
+      (u) => {
+        // Shade the band under the plot line, inside the plotting area.
+        const x0 = u.valToPos(bandHz[0], 'x', true)
+        const x1 = u.valToPos(bandHz[1], 'x', true)
+        const { top, height: h } = u.bbox
+        u.ctx.save()
+        u.ctx.fillStyle = c.band
+        u.ctx.fillRect(x0, top, x1 - x0, h)
+        u.ctx.restore()
+      },
+    ],
+  }
+  const u = new uPlot(o, [psd.freqHz, psd.power as never], mount)
   const unobserve = observeSize(el, mount, u, height)
   return {
     destroy() {

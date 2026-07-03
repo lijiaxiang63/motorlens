@@ -21,6 +21,7 @@ import type {
   CycleTestDefinition,
   RomTestDefinition,
   TestDefinition,
+  TremorTestDefinition,
 } from '../protocol/definitions'
 import type { Subject } from '../store/subjects'
 import type {
@@ -31,6 +32,7 @@ import type {
   ReportSource,
   RomAnalysis,
   TestId,
+  TremorAnalysis,
 } from '../types'
 
 /** Threaded through record → results when a test runs for a registered
@@ -72,7 +74,12 @@ export type RomResultProps = ResultCommon & {
   def: RomTestDefinition
   analysis: RomAnalysis
 }
-export type ResultProps = CycleResultProps | RomResultProps
+export type TremorResultProps = ResultCommon & {
+  family: 'tremor'
+  def: TremorTestDefinition
+  analysis: TremorAnalysis
+}
+export type ResultProps = CycleResultProps | RomResultProps | TremorResultProps
 
 export type ScreenRequest =
   | { name: 'home' }
