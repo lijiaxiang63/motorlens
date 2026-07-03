@@ -128,9 +128,9 @@ export interface CycleAnalysis {
 
 /** Union of every test family's analysis bundle. Each family carries the
  *  same four top-level members (metrics/signal/events/quality) so
- *  buildSessionReport stays a single non-branching path — tremor and ROM
- *  arms join this union with their milestones. */
-export type TestAnalysis = CycleAnalysis
+ *  buildSessionReport stays a single non-branching path — the tremor arm
+ *  joins this union with its milestone. */
+export type TestAnalysis = CycleAnalysis | RomAnalysis
 
 // ---------------------------------------------------------------------------
 // Joints
@@ -152,6 +152,32 @@ export interface JointSummary {
 }
 
 export type JointSummaries = Record<JointId, JointSummary>
+
+/** Timed ROM test metrics (family 'rom'). Deliberately no top-level numeric
+ *  `count` field — metrics shapes are discriminated by test-id family, and
+ *  keeping shapes disjoint is the belt-and-suspenders backstop. */
+export interface RomMetrics {
+  joints: JointSummaries
+  /** Sum of the finger's joint ROMs, ° (thumb: cmc+mcp+ip; others:
+   *  mcp+pip+dip). Null when the joint saw no samples. */
+  perFinger: Record<Finger, number | null>
+  /** Sum over all 15 joints, ° — equals Σ perFinger by construction. */
+  totalActiveRomDeg: number | null
+}
+
+/** Full analysis bundle for a timed ROM recording. Carries the same four
+ *  top-level members as CycleAnalysis so buildSessionReport needs no
+ *  per-family branch. */
+export interface RomAnalysis {
+  metrics: RomMetrics
+  /** Sum of all 15 smoothed joint flexions, ° — doubles as report.series. */
+  signal: Series
+  /** Always empty — ROM has no discrete events. */
+  events: CycleEvent[]
+  /** Smoothed per-joint traces for the results screen. */
+  jointSeries: Record<JointId, Series>
+  quality: QualityMetrics
+}
 
 // ---------------------------------------------------------------------------
 // Session report (export JSON)
@@ -188,7 +214,7 @@ export interface SessionReport {
   startedAt: string
   durationMs: number
   quality: QualityMetrics | null
-  metrics: CycleTestMetrics | JointSummaries
+  metrics: CycleTestMetrics | JointSummaries | RomMetrics
   series: Series
   events: CycleEvent[]
   raw: { frames: LandmarkFrame[] }

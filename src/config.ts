@@ -4,6 +4,7 @@
 export const TAP_TEST_MS = 10_000
 export const FIST_TEST_MS = 10_000
 export const PRONOSUP_TEST_MS = 10_000
+export const ROM_TEST_MS = 10_000
 export const COUNTDOWN_MS = 3_000
 
 // Positioning gates (evaluated over a trailing window of frames)

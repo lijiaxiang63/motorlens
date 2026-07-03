@@ -106,18 +106,29 @@ function computeQuality(
   rawScales: number[],
   events: CycleEvent[],
 ): QualityMetrics {
-  const n = frames.length
-  const span = n >= 2 ? frames[n - 1]!.t - frames[0]!.t : 0
-  const detected = frames.reduce((acc, f) => acc + (f.landmarks ? 1 : 0), 0)
-  const scaleCv = cvPct(rawScales)
   let dropped = 0
   for (let i = 1; i < events.length; i++) {
     if (events[i]!.segment !== events[i - 1]!.segment) dropped++
   }
+  return computeFrameQuality(frames, rawScales, dropped)
+}
+
+/** Frame-level quality shared across test families. `droppedIntervals` is
+ *  caller-defined: cycle tests count cross-segment event transitions, ROM
+ *  counts tracking-gap splits directly. */
+export function computeFrameQuality(
+  frames: LandmarkFrame[],
+  rawScales: number[],
+  droppedIntervals: number,
+): QualityMetrics {
+  const n = frames.length
+  const span = n >= 2 ? frames[n - 1]!.t - frames[0]!.t : 0
+  const detected = frames.reduce((acc, f) => acc + (f.landmarks ? 1 : 0), 0)
+  const scaleCv = cvPct(rawScales)
   return {
     meanFps: span > 0 ? ((n - 1) / span) * 1000 : 0,
     detectionRate: n > 0 ? detected / n : 0,
-    droppedIntervals: dropped,
+    droppedIntervals,
     handScaleCvPct: Number.isFinite(scaleCv) ? scaleCv : 0,
   }
 }

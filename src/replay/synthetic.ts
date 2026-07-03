@@ -347,6 +347,70 @@ export interface AngleGenOpts {
   handedness?: Hand
 }
 
+/** Full-hand sweep maxima shared by the angles-sweep monitor preset, the
+ *  timed-ROM preset, and the ROM ground-truth suite. Total: 890°. */
+export const ROM_SWEEP_FLEXIONS: Partial<Record<JointId, number>> = {
+  index_mcp: 50,
+  index_pip: 95,
+  index_dip: 60,
+  middle_mcp: 50,
+  middle_pip: 95,
+  middle_dip: 60,
+  ring_mcp: 45,
+  ring_pip: 90,
+  ring_dip: 55,
+  pinky_mcp: 45,
+  pinky_pip: 85,
+  pinky_dip: 55,
+  thumb_cmc: 20,
+  thumb_mcp: 35,
+  thumb_ip: 50,
+}
+
+export interface RomSweepOpts {
+  /** Scheduled per-joint flexion maxima, degrees (exact FK ground truth). */
+  flexions?: Partial<Record<JointId, number>>
+  /** Full open→close→open sweep period. */
+  cycleMs?: number
+  durationMs?: number
+  fps?: number
+  handedness?: Hand
+  dropouts?: { atMs: number; durMs: number }[]
+}
+
+export interface RomSweepResult {
+  frames: LandmarkFrame[]
+  truth: { maxFlexions: Partial<Record<JointId, number>> }
+}
+
+/** Timed-ROM sweep: every scheduled joint flexes 0 → max → 0 on a raised
+ *  cosine. buildFlexedHand's forward kinematics is exact, so each joint's
+ *  scheduled maximum IS the ground-truth ROM (the phase hits exactly 1 at
+ *  cycleMs/2, which lands on a sample at the default 30 fps / 4 s cycle). */
+export function makeRomSweepFrames(opts: RomSweepOpts = {}): RomSweepResult {
+  const flexions = opts.flexions ?? ROM_SWEEP_FLEXIONS
+  const cycleMs = opts.cycleMs ?? 4_000
+  const durationMs = opts.durationMs ?? 10_000
+  const fps = opts.fps ?? 30
+  const handedness = opts.handedness ?? ('right' as Hand)
+  const frames: LandmarkFrame[] = []
+  const dt = 1000 / fps
+  for (let tMs = 0; tMs < durationMs; tMs += dt) {
+    const dropped = (opts.dropouts ?? []).some((d) => tMs >= d.atMs && tMs < d.atMs + d.durMs)
+    if (dropped) {
+      frames.push(blankFrame(tMs))
+      continue
+    }
+    const phase = (1 - Math.cos((2 * Math.PI * tMs) / cycleMs)) / 2
+    const scaled: Partial<Record<JointId, number>> = {}
+    for (const [id, deg] of Object.entries(flexions)) {
+      scaled[id as JointId] = deg * phase
+    }
+    frames.push(toFrame(buildFlexedHand(scaled), tMs, handedness))
+  }
+  return { frames, truth: { maxFlexions: flexions } }
+}
+
 /** Frames where joint flexions follow `flexionsAt(tMs)`. */
 export function makeAngleFrames(
   flexionsAt: (tMs: number) => Partial<Record<JointId, number>>,
