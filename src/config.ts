@@ -5,6 +5,7 @@ export const TAP_TEST_MS = 10_000
 export const FIST_TEST_MS = 10_000
 export const PRONOSUP_TEST_MS = 10_000
 export const ROM_TEST_MS = 10_000
+export const TREMOR_TEST_MS = 15_000
 export const COUNTDOWN_MS = 3_000
 
 // Positioning gates (evaluated over a trailing window of frames)
@@ -44,6 +45,22 @@ export const FIST_HESITATION_ABS_MS = 700
 export const PRONOSUP_HESITATION_ABS_MS = 700
 /** Trailing median window (in detected frames) for the hand-scale signal. */
 export const HAND_SCALE_MEDIAN_WINDOW = 15
+
+// --- Tremor analysis (Phase 4b) ---
+/** Clinical tremor band: dominant frequency + band power live here. */
+export const TREMOR_BAND_HZ: readonly [number, number] = [3, 12]
+/** Denominator band for the tremor index (excludes DC/very slow drift;
+ *  capped at the 15 Hz Nyquist of the 30 Hz resampled grid). */
+export const TREMOR_TOTAL_BAND_HZ: readonly [number, number] = [0.5, 15]
+/** Uniform resampling rate for spectral analysis (≥ camera fps). */
+export const TREMOR_RESAMPLE_HZ = 30
+/** Welch segments need this many resampled samples (~4.3 s at 30 Hz) so
+ *  every included run shares one frequency grid; shorter runs are skipped
+ *  (with a single-run fallback when nothing qualifies). */
+export const TREMOR_PSD_SEGMENT_SAMPLES = 128
+/** Below this tremor index (% of 0.5–15 Hz power inside 3–12 Hz), the
+ *  result is flagged low-confidence — no discernible tremor peak. */
+export const TREMOR_LOW_CONFIDENCE_INDEX_PCT = 20
 /**
  * Warn when the projected hand-scale CV exceeds this, %. Movement signals
  * come from rotation-invariant world landmarks, so this no longer affects
@@ -84,6 +101,8 @@ export const TAP_LIVE_Y_RANGE: readonly [number, number] = [0, 1.8]
 export const FIST_LIVE_Y_RANGE: readonly [number, number] = [0, 2.6]
 /** Live pronation-supination chart plots the WRAPPED roll (±180°). */
 export const PRONOSUP_LIVE_Y_RANGE: readonly [number, number] = [-180, 180]
+/** Live tremor chart plots centroid displacement vs a slow baseline, cm. */
+export const TREMOR_LIVE_Y_RANGE: readonly [number, number] = [-2, 2]
 
 // --- Subjects & local storage (IndexedDB) ---
 export const DB_NAME = 'motorlens'

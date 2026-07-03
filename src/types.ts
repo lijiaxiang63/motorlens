@@ -15,6 +15,8 @@ export type TestId =
   | 'fist_open_close'
   | 'pronation_supination'
   | 'rom_test'
+  | 'tremor_postural'
+  | 'tremor_rest'
   | 'joint_monitor'
 
 export interface LandmarkFrame {
@@ -131,11 +133,47 @@ export interface CycleAnalysis {
   quality: QualityMetrics
 }
 
+/** Postural/rest tremor metrics (family 'tremor'). Displacements come from
+ *  IMAGE-space centroid motion converted to cm — world landmarks are
+ *  hand-centered and blind to whole-hand translation. Deliberately no
+ *  top-level numeric `count` (see RomMetrics). */
+export interface TremorMetrics {
+  /** Peak PSD bin inside the 3–12 Hz tremor band, or null without a PSD. */
+  dominantFreqHz: number | null
+  /** Integrated 3–12 Hz power across both axes, cm². */
+  bandPowerCm2: number | null
+  /** 100 · band(3–12 Hz) / total(0.5–15 Hz) — how peaked the motion is
+   *  inside the tremor band. Below ~20 there is no discernible tremor. */
+  tremorIndexPct: number | null
+  /** √bandPowerCm2 — in-band RMS displacement across both axes, cm. */
+  rmsAmplitudeCm: number | null
+  /** Max |detrended displacement| over both axes, cm. */
+  peakAmplitudeCm: number | null
+  /** Per-axis share of the in-band power, % (sums to 100). */
+  axisSharePct: { x: number; y: number } | null
+  /** Detected frames that entered the analysis (NOT a `count` field). */
+  sampleCount: number
+}
+
+/** Full analysis bundle for a tremor recording. Same four top-level members
+ *  as CycleAnalysis so buildSessionReport needs no per-family branch. */
+export interface TremorAnalysis {
+  metrics: TremorMetrics
+  /** Dominant-axis detrended displacement, cm — doubles as report.series. */
+  signal: Series
+  /** Always empty — tremor has no discrete events. */
+  events: CycleEvent[]
+  /** Both detrended displacement axes (resampled grid), cm. */
+  displacement: { x: Series; y: Series }
+  /** Combined-axes Welch PSD (x + y), cm²/Hz. */
+  psd: { freqHz: number[]; power: number[] }
+  quality: QualityMetrics
+}
+
 /** Union of every test family's analysis bundle. Each family carries the
  *  same four top-level members (metrics/signal/events/quality) so
- *  buildSessionReport stays a single non-branching path — the tremor arm
- *  joins this union with its milestone. */
-export type TestAnalysis = CycleAnalysis | RomAnalysis
+ *  buildSessionReport stays a single non-branching path. */
+export type TestAnalysis = CycleAnalysis | RomAnalysis | TremorAnalysis
 
 // ---------------------------------------------------------------------------
 // Joints
@@ -219,7 +257,7 @@ export interface SessionReport {
   startedAt: string
   durationMs: number
   quality: QualityMetrics | null
-  metrics: CycleTestMetrics | JointSummaries | RomMetrics
+  metrics: CycleTestMetrics | JointSummaries | RomMetrics | TremorMetrics
   series: Series
   events: CycleEvent[]
   raw: { frames: LandmarkFrame[] }

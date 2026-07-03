@@ -298,6 +298,77 @@ export function makePronosupFrames(opts: PronosupGenOpts = {}): CycleGenResult {
   })
 }
 
+export interface TremorGenOpts {
+  /** Primary tremor tone. */
+  freqHz?: number
+  /** Peak displacement of the primary tone, cm. 0 = no tremor. */
+  ampCm?: number
+  /** Direction of the oscillation in the image plane, degrees from +x. */
+  axisDeg?: number
+  /** Optional second tone (two-tone spectra). */
+  secondary?: { freqHz: number; ampCm: number }
+  /** Slow postural drift (a tremor-free hand sways below the band). */
+  drift?: { freqHz: number; ampCm: number }
+  /** White noise per axis, cm. */
+  noiseSdCm?: number
+  durationMs?: number
+  fps?: number
+  dropouts?: { atMs: number; durMs: number }[]
+  seed?: number
+  handedness?: Hand
+}
+
+export interface TremorGenResult {
+  frames: LandmarkFrame[]
+  truth: { freqHz: number; ampCm: number; rmsCm: number }
+}
+
+/** Tremor frames: the WORLD landmarks stay the untranslated neutral template
+ *  (hand-centered, exactly like real MediaPipe world coordinates — whole-hand
+ *  translation is invisible there); only the projected image landmarks
+ *  translate. Displacement is defined in aspect-corrected image units so the
+ *  analyzer's cm conversion (worldScale·100/rawScale = exactly 100 for this
+ *  template) recovers ampCm exactly. truth.rmsCm covers primary + secondary
+ *  tones (each tone contributes amp²/2 to the variance). */
+export function makeTremorFrames(opts: TremorGenOpts = {}): TremorGenResult {
+  const freqHz = opts.freqHz ?? 5
+  const ampCm = opts.ampCm ?? 0.8
+  const axis = ((opts.axisDeg ?? 25) * Math.PI) / 180
+  const durationMs = opts.durationMs ?? 15_000
+  const fps = opts.fps ?? 30
+  const noiseSdCm = opts.noiseSdCm ?? 0
+  const handedness = opts.handedness ?? ('right' as Hand)
+  const noise = gaussian(mulberry32((opts.seed ?? 1) + 104_729))
+  const world = HAND_TEMPLATE.map((p) => ({ ...p }))
+  const frames: LandmarkFrame[] = []
+  const dt = 1000 / fps
+  for (let tMs = 0; tMs < durationMs; tMs += dt) {
+    const dropped = (opts.dropouts ?? []).some((d) => tMs >= d.atMs && tMs < d.atMs + d.durMs)
+    if (dropped) {
+      frames.push(blankFrame(tMs))
+      continue
+    }
+    const tS = tMs / 1000
+    let s = ampCm * Math.sin(2 * Math.PI * freqHz * tS)
+    if (opts.secondary) s += opts.secondary.ampCm * Math.sin(2 * Math.PI * opts.secondary.freqHz * tS)
+    if (opts.drift) s += opts.drift.ampCm * Math.sin(2 * Math.PI * opts.drift.freqHz * tS)
+    // Aspect-corrected image-unit displacement (1 unit = 100 cm here).
+    const dx = (s * Math.cos(axis) + noiseSdCm * noise()) / 100
+    const dy = (s * Math.sin(axis) + noiseSdCm * noise()) / 100
+    const landmarks = world.map((w) => ({
+      x: 0.5 + (w.x + dx) / SYNTH_ASPECT,
+      y: 0.55 + w.y + dy,
+      z: w.z / SYNTH_ASPECT,
+    }))
+    frames.push({ t: tMs, landmarks, world, handedness, score: 1, aspect: SYNTH_ASPECT })
+  }
+  const secondaryVar = opts.secondary ? opts.secondary.ampCm ** 2 / 2 : 0
+  return {
+    frames,
+    truth: { freqHz, ampCm, rmsCm: Math.sqrt(ampCm ** 2 / 2 + secondaryVar) },
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Joint-angle generator (forward kinematics)
 
