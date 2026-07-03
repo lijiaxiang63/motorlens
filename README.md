@@ -35,7 +35,32 @@ the source video) to on-device storage; **Video Analysis** uploads an existing
 recording, auto-segments it into individual taps/fists for review and
 correction, and analyzes each confirmed segment with the same pipeline.
 "Export all (ZIP)" bundles every subject's results, videos, and a
-`summary.csv` into one download.
+`summary.csv` into one download; "Import backup ZIP" restores from one on
+another install (e.g. moving data between the browser build and the desktop
+app, which use separate on-device storage). A free-text note can be attached
+to any saved result.
+
+## Analytics & clinical reports
+
+Every subject's hub page surfaces:
+
+- **Bilateral asymmetry** — same-day left/right pairs compared side-by-side
+  (mirrored bars) with a signed asymmetry index, so left/right differences
+  are visible at a glance rather than buried in two separate result rows.
+- **Longitudinal trends** — a sparkline per headline metric across every
+  session, with an outlier-robust (Theil–Sen) trend line and a click-through
+  to the full session-by-session chart.
+- **Result comparison** — pick any two saved results for a side-by-side
+  metric delta table, plus overlaid signal/amplitude charts when they're the
+  same test.
+
+Any saved result or subject can generate a **clinical PDF report** — a
+per-session report (metrics, signal/amplitude charts, notes) or a per-subject
+summary (latest results per hand, trends, asymmetry, full session history).
+Settings lets you configure **reference cues** — a warn-below/warn-above band
+per metric that flags out-of-range values on-screen and in the PDF. These are
+operator-configured cues for tracking change over time, **not validated
+clinical norms** — every report says so.
 
 ## Desktop app
 
