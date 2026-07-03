@@ -227,13 +227,31 @@ npm run build
 6. Fist test: 8 full open–close cycles → count 8.
 7. Joint Monitor: straight fingers read < ~15°, a full fist puts PIP joints
    around 90–110°, ROM accumulates, Reset works.
-8. Export JSON from a result, drag it back onto home → identical metrics.
+8. Pronation–supination: elbow on the table, rotate the palm through ~8 slow
+   full turns → count ≈ 8, amplitude in a plausible degree range for your
+   rotation (a quarter turn ≈ 90°); the live chart's wrapped roll may jump
+   at ±180° — the computed amplitude must not.
+9. Range of Motion: 2–3 slow full open→fist sweeps → index/middle finger
+   ROMs ≳ 180°, total active ROM in the several-hundred-degree range,
+   per-joint table plausible.
+10. Tremor (postural): hold the hand outstretched as still as you can →
+    low tremor index with the low-confidence banner; then deliberately shake
+    the hand at a steady small amplitude → a clear dominant frequency and a
+    peaked spectrum in the 3–12 Hz band. Repeat with the hand at rest.
+11. Export JSON from a result, drag it back onto home → identical metrics.
 
 > **Platform caveat** — the checklist above (and `SWAP_RAW_HANDEDNESS` in
 > `src/config.ts`) has only been verified on macOS with a built-in camera.
 > The Windows desktop build has not had a real-camera check yet; if
 > handedness reads flipped on Windows, that flag may need a platform-specific
 > value.
+>
+> **Pending validations** — the Phase 4 assessments (pronation–supination,
+> Range of Motion, tremor; steps 8–10) are fully verified against synthetic
+> ground truth but have **not yet had their per-test real-camera check**, and
+> the clinical PDF still needs a visual pass in Preview from the packaged
+> desktop app (fonts, chart sharpness, page breaks — headless checks assert
+> byte structure only). Both are release gates.
 
 ## Architecture notes
 
