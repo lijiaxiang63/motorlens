@@ -92,6 +92,55 @@ describe('computePronosupMetrics on synthetic ground truth', () => {
     expect(metrics.amplitudeMean).toBeLessThan(80 * 1.08)
   })
 
+  it('recovers count, frequency, and amplitude with the arm extended toward the camera', () => {
+    // The clinical posture: arm out in front of the body, palm down, subject
+    // facing the camera — the forearm sits ~20° off the optical axis. The
+    // old fixed x/z-plane projection degenerated here (the palm normal
+    // sweeps the x/y plane); the axis-adaptive roll must not.
+    const { frames, truth } = makePronosupFrames({
+      posture: 'forward',
+      freqHz: 1,
+      durationMs: 10_500,
+    })
+    const { metrics, quality } = computePronosupMetrics(frames)
+
+    expect(truth.count).toBe(10)
+    expect(metrics.count).toBe(truth.count)
+    expect(Math.abs(metrics.frequencyHz! - 1)).toBeLessThan(0.05)
+    expect(metrics.amplitudeMean).toBeGreaterThan(80 * 0.92)
+    expect(metrics.amplitudeMean).toBeLessThan(80 * 1.08)
+    expect(metrics.cmPerUnit).toBeNull()
+    expect(metrics.rhythm.hesitationCount).toBe(0)
+    expect(quality.detectionRate).toBe(1)
+  })
+
+  it('is immune to overlaid pitch in the forward posture', () => {
+    // Pitch composes with the forward tilt (both rotate about x), so the
+    // forearm swings between ~10° and ~30° off the optical axis mid-test.
+    const { frames, truth } = makePronosupFrames({ posture: 'forward', freqHz: 1 })
+    const base = computePronosupMetrics(frames).metrics
+    const { metrics } = computePronosupMetrics(pitchWobble(frames, 10, 0.7))
+
+    expect(Math.abs(metrics.count - truth.count)).toBeLessThanOrEqual(1)
+    expect(Math.abs(metrics.frequencyHz! - 1)).toBeLessThan(0.05)
+    expect(Math.abs(metrics.amplitudeMean! - base.amplitudeMean!) / base.amplitudeMean!).toBeLessThan(
+      0.05,
+    )
+  })
+
+  it('unwraps across ±180° in the forward posture too', () => {
+    const { frames, truth } = makePronosupFrames({
+      posture: 'forward',
+      freqHz: 1,
+      durationMs: 10_500,
+      rollOffsetDeg: 100,
+    })
+    const { metrics } = computePronosupMetrics(frames)
+    expect(metrics.count).toBe(truth.count)
+    expect(metrics.amplitudeMean).toBeGreaterThan(80 * 0.92)
+    expect(metrics.amplitudeMean).toBeLessThan(80 * 1.08)
+  })
+
   it('splits segments on dropout without phantom events', () => {
     const { frames, truth } = makePronosupFrames({
       freqHz: 1,

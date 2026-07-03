@@ -135,21 +135,23 @@ export interface CycleAnalysis {
 
 /** Postural/rest tremor metrics (family 'tremor'). Displacements come from
  *  IMAGE-space centroid motion converted to cm — world landmarks are
- *  hand-centered and blind to whole-hand translation. Deliberately no
- *  top-level numeric `count` (see RomMetrics). */
+ *  hand-centered and blind to whole-hand translation. The rest test adds a
+ *  thumb–index world-distance channel (pill-rolling; see metrics/tremor.ts).
+ *  Deliberately no top-level numeric `count` (see RomMetrics). */
 export interface TremorMetrics {
   /** Peak PSD bin inside the 3–12 Hz tremor band, or null without a PSD. */
   dominantFreqHz: number | null
-  /** Integrated 3–12 Hz power across both axes, cm². */
+  /** Integrated 3–12 Hz power across all analyzed channels, cm². */
   bandPowerCm2: number | null
   /** 100 · band(3–12 Hz) / total(0.5–15 Hz) — how peaked the motion is
    *  inside the tremor band. Below ~20 there is no discernible tremor. */
   tremorIndexPct: number | null
-  /** √bandPowerCm2 — in-band RMS displacement across both axes, cm. */
+  /** √bandPowerCm2 — in-band RMS amplitude across all channels, cm. */
   rmsAmplitudeCm: number | null
-  /** Max |detrended displacement| over both axes, cm. */
+  /** Max |detrended amplitude| over all channels, cm. */
   peakAmplitudeCm: number | null
-  /** Per-axis share of the in-band power, % (sums to 100). */
+  /** Per-axis share of the in-band TRANSLATION power, % (sums to 100; the
+   *  rest test's finger channel is deliberately not part of this split). */
   axisSharePct: { x: number; y: number } | null
   /** Detected frames that entered the analysis (NOT a `count` field). */
   sampleCount: number
@@ -159,13 +161,14 @@ export interface TremorMetrics {
  *  as CycleAnalysis so buildSessionReport needs no per-family branch. */
 export interface TremorAnalysis {
   metrics: TremorMetrics
-  /** Dominant-axis detrended displacement, cm — doubles as report.series. */
+  /** Dominant-channel detrended amplitude trace, cm — doubles as
+   *  report.series (may be the finger channel on a rest recording). */
   signal: Series
   /** Always empty — tremor has no discrete events. */
   events: CycleEvent[]
   /** Both detrended displacement axes (resampled grid), cm. */
   displacement: { x: Series; y: Series }
-  /** Combined-axes Welch PSD (x + y), cm²/Hz. */
+  /** Combined Welch PSD over all analyzed channels, cm²/Hz. */
   psd: { freqHz: number[]; power: number[] }
   quality: QualityMetrics
 }

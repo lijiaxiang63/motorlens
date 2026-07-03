@@ -13,8 +13,16 @@ export const GATE_WINDOW_FRAMES = 30
 export const GATE_PRESENCE_MIN = 0.9
 export const GATE_HANDEDNESS_MIN = 0.8
 export const GATE_MIN_FPS = 15
-/** Acceptable hand scale |P0−P9| range in height units (too far / too close). */
+/** Acceptable gate hand-scale range in height units (too far / too close).
+ *  Measured by gateHandScale: max of palm length |P0−P9| and knuckle width
+ *  |P5−P17|, so a foreshortened arm-toward-camera posture is judged by its
+ *  still-visible knuckle line rather than its collapsed palm length. */
 export const HAND_SCALE_RANGE: readonly [number, number] = [0.06, 0.5]
+/** Relaxed floor for the tremor tests: the postural posture shows mostly
+ *  the (shorter) knuckle width, and the rest posture (hand on the armrest,
+ *  subject seated) sits farther from a camera framing the upper body. The
+ *  instructions still tell the operator to aim the camera at the hand. */
+export const TREMOR_HAND_SCALE_RANGE: readonly [number, number] = [0.045, 0.5]
 /** Hand lost for longer than this during countdown → back to positioning. */
 export const COUNTDOWN_HAND_LOST_MS = 500
 

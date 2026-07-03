@@ -11,7 +11,7 @@ import {
   GATE_WINDOW_FRAMES,
   HAND_SCALE_RANGE,
 } from '../config'
-import { rawHandScale } from '../metrics/kinematics'
+import { gateHandScale } from '../metrics/kinematics'
 import { mean } from '../signal/stats'
 import type { Hand, LandmarkFrame } from '../types'
 
@@ -42,6 +42,8 @@ export class TestSession {
   constructor(
     private durationMs: number,
     private hand: Hand,
+    /** Per-test framing-gate range (TestDefinition.handScaleRange). */
+    private handScaleRange: readonly [number, number] = HAND_SCALE_RANGE,
   ) {}
 
   get current(): Phase {
@@ -120,9 +122,9 @@ export class TestSession {
     } else {
       const matching = detected.filter((f) => f.handedness === this.hand)
       if (matching.length / detected.length < GATE_HANDEDNESS_MIN) issues.push('wrong_hand')
-      const scale = mean(detected.map((f) => rawHandScale(f.landmarks!, f.aspect)))
-      if (scale < HAND_SCALE_RANGE[0]) issues.push('too_far')
-      if (scale > HAND_SCALE_RANGE[1]) issues.push('too_close')
+      const scale = mean(detected.map((f) => gateHandScale(f.landmarks!, f.aspect)))
+      if (scale < this.handScaleRange[0]) issues.push('too_far')
+      if (scale > this.handScaleRange[1]) issues.push('too_close')
     }
     const span = w[w.length - 1]!.t - w[0]!.t
     if (span <= 0 || ((w.length - 1) / span) * 1000 < GATE_MIN_FPS) issues.push('low_fps')

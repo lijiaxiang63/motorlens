@@ -18,7 +18,9 @@ import type { LandmarkFrame, Series, Vec3 } from '../types'
 export const WRIST = 0
 export const THUMB_TIP = 4
 export const INDEX_TIP = 8
+export const INDEX_MCP = 5
 export const MIDDLE_MCP = 9
+export const PINKY_MCP = 17
 /** Aperture fingertips (thumb excluded). */
 export const APERTURE_TIPS = [8, 12, 16, 20] as const
 
@@ -32,14 +34,81 @@ export function dist3D(a: Vec3, b: Vec3): number {
   return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z)
 }
 
-/** Projected hand size in image space — for framing gates and quality. */
+/** Projected hand size in image space — for the positioning-stability
+ *  quality metric (and as the detected-frame filter's degeneracy guard). */
 export function rawHandScale(landmarks: Vec3[], aspect: number): number {
   return dist2D(landmarks[WRIST]!, landmarks[MIDDLE_MCP]!, aspect)
+}
+
+/** Foreshortening-robust projected hand size for the framing gates: the
+ *  larger of two roughly-orthogonal palm segments — palm length (wrist →
+ *  middle MCP) and knuckle width (index MCP → pinky MCP). Whatever the hand
+ *  orientation, at least one of the two stays substantially in the image
+ *  plane: with the arm extended toward the camera the palm length collapses
+ *  (≈3× foreshortened) but the knuckle line stays visible — gating on palm
+ *  length alone falsely read that posture as "too far". For a hand facing
+ *  the camera this equals rawHandScale (palm length > knuckle width), so
+ *  facing-hand gate behavior is unchanged. */
+export function gateHandScale(landmarks: Vec3[], aspect: number): number {
+  return Math.max(
+    dist2D(landmarks[WRIST]!, landmarks[MIDDLE_MCP]!, aspect),
+    dist2D(landmarks[INDEX_MCP]!, landmarks[PINKY_MCP]!, aspect),
+  )
 }
 
 /** Metric hand size from world landmarks (≈ constant for a given hand). */
 export function worldHandScale(world: Vec3[]): number {
   return dist3D(world[WRIST]!, world[MIDDLE_MCP]!)
+}
+
+/** Centimeters per aspect-corrected image unit, from a least-squares fit of
+ *  the world landmarks' IN-PLANE (x/y) coordinates onto the image landmarks
+ *  across all 21 points (both centered; k = Σ î·ŵ / Σ |ŵ|² image units per
+ *  meter, cm/unit = 100/k).
+ *
+ *  Foreshortening-robust: a hand pointing at the camera shrinks the image
+ *  and world x/y spreads by the same factor, so the ratio survives — unlike
+ *  a single projected segment (e.g. wrist→middle-MCP), whose world/image
+ *  length ratio explodes as that segment aligns with the optical axis (the
+ *  arm-extended-toward-camera tremor posture: several-fold cm inflation).
+ *  Image noise averages out over the 21 points and is uncorrelated with ŵ,
+ *  so the fit is unbiased where a spread RATIO would overestimate.
+ *
+ *  Returns null when the in-plane world spread is degenerate (never for a
+ *  physical hand — landmarks cannot be collinear along the optical axis). */
+export function fitCmPerImageUnit(
+  landmarks: Vec3[],
+  world: Vec3[],
+  aspect: number,
+): number | null {
+  const n = Math.min(landmarks.length, world.length)
+  if (n < 2) return null
+  let mix = 0
+  let miy = 0
+  let mwx = 0
+  let mwy = 0
+  for (let j = 0; j < n; j++) {
+    mix += landmarks[j]!.x * aspect
+    miy += landmarks[j]!.y
+    mwx += world[j]!.x
+    mwy += world[j]!.y
+  }
+  mix /= n
+  miy /= n
+  mwx /= n
+  mwy /= n
+  let dot = 0
+  let ww = 0
+  for (let j = 0; j < n; j++) {
+    const ix = landmarks[j]!.x * aspect - mix
+    const iy = landmarks[j]!.y - miy
+    const wx = world[j]!.x - mwx
+    const wy = world[j]!.y - mwy
+    dot += ix * wx + iy * wy
+    ww += wx * wx + wy * wy
+  }
+  if (ww < 1e-10 || dot <= 0) return null
+  return (100 * ww) / dot
 }
 
 /** Trailing-median smoother for the hand-scale divisor (robust to blips). */

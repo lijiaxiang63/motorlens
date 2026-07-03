@@ -28,6 +28,64 @@ describe('computeTremorMetrics on synthetic ground truth', () => {
     expect(displacement.x.t).toHaveLength(displacement.y.t.length)
   })
 
+  it('recovers amplitude with the arm extended toward the camera (foreshortened hand)', () => {
+    // The clinical postural-tremor posture: arm out in front, palm down,
+    // subject facing the camera. The projected wrist→middle-MCP segment is
+    // ~3× foreshortened here; the old segment-ratio cm conversion inflated
+    // every amplitude metric by the same factor (rms ≈ 1.65 instead of 0.57).
+    const { frames, truth } = makeTremorFrames({ posture: 'forward', freqHz: 5, ampCm: 0.8 })
+    const { metrics } = computeTremorMetrics(frames)
+
+    expect(metrics.dominantFreqHz).not.toBeNull()
+    expect(Math.abs(metrics.dominantFreqHz! - 5)).toBeLessThan(0.2)
+    expect(metrics.rmsAmplitudeCm).not.toBeNull()
+    expect(Math.abs(metrics.rmsAmplitudeCm! - truth.rmsCm) / truth.rmsCm).toBeLessThan(0.15)
+    expect(metrics.peakAmplitudeCm!).toBeGreaterThan(0.5)
+    expect(metrics.peakAmplitudeCm!).toBeLessThan(1.2)
+    expect(isLowConfidenceTremor(metrics)).toBe(false)
+  })
+
+  it('rest channel: detects pill-rolling finger tremor the palm centroid is blind to', () => {
+    // Pure pill-rolling: thumb–index separation oscillates at 5 Hz while the
+    // palm centroid only drifts slowly (plus a little landmark noise) — a
+    // realistic resting hand. The centroid-only analysis must NOT see the
+    // tremor (that blindness protects the postural test from voluntary
+    // finger motion); the rest test's finger channel must.
+    const { frames } = makeTremorFrames({
+      ampCm: 0,
+      finger: { freqHz: 5, ampCm: 0.5 },
+      drift: { freqHz: 0.8, ampCm: 0.4 },
+      noiseSdCm: 0.02,
+      seed: 4,
+    })
+
+    const centroidOnly = computeTremorMetrics(frames)
+    expect(isLowConfidenceTremor(centroidOnly.metrics)).toBe(true)
+
+    const rest = computeTremorMetrics(frames, { fingerChannel: true })
+    expect(rest.metrics.dominantFreqHz).not.toBeNull()
+    expect(Math.abs(rest.metrics.dominantFreqHz! - 5)).toBeLessThan(0.2)
+    const expectedRms = 0.5 / Math.SQRT2
+    expect(Math.abs(rest.metrics.rmsAmplitudeCm! - expectedRms) / expectedRms).toBeLessThan(0.15)
+    expect(isLowConfidenceTremor(rest.metrics)).toBe(false)
+    // The headline trace is the dominant channel — here the finger signal.
+    expect(Math.max(...rest.signal.v.map(Math.abs))).toBeGreaterThan(0.3)
+  })
+
+  it('rest channel: combines translation and pill-rolling power', () => {
+    const { frames, truth } = makeTremorFrames({
+      freqHz: 5,
+      ampCm: 0.6,
+      finger: { freqHz: 5, ampCm: 0.4 },
+    })
+    const { metrics } = computeTremorMetrics(frames, { fingerChannel: true })
+    // truth.rmsCm covers both tones (√(0.6²/2 + 0.4²/2) ≈ 0.51 cm).
+    expect(Math.abs(metrics.rmsAmplitudeCm! - truth.rmsCm) / truth.rmsCm).toBeLessThan(0.15)
+    // Axis share still describes the translation split only and sums to 100.
+    expect(metrics.axisSharePct).not.toBeNull()
+    expect(metrics.axisSharePct!.x + metrics.axisSharePct!.y).toBeCloseTo(100, 6)
+  })
+
   it('does not flag a tremor-free hand (slow postural drift only)', () => {
     const { frames } = makeTremorFrames({
       ampCm: 0,

@@ -83,6 +83,33 @@ function build(name: string): Preset | null {
         frames: makePronosupFrames({ durationMs: DURATION, freqHz: 1, noiseSd: 1.5, seed: 8 })
           .frames,
       }
+    case 'pronosup-forward':
+      return {
+        name,
+        description:
+          'Steady 1 Hz pronation-supination with the arm extended toward the camera (foreshortened hand)',
+        frames: makePronosupFrames({
+          durationMs: DURATION,
+          freqHz: 1,
+          posture: 'forward',
+          noiseSd: 1.5,
+          seed: 10,
+        }).frames,
+      }
+    case 'tremor-forward':
+      return {
+        name,
+        description:
+          'Steady 5 Hz postural tremor with the arm extended toward the camera (foreshortened hand)',
+        frames: makeTremorFrames({
+          durationMs: TREMOR_DURATION,
+          freqHz: 5,
+          ampCm: 0.8,
+          posture: 'forward',
+          noiseSdCm: 0.02,
+          seed: 11,
+        }).frames,
+      }
     case 'tremor-5hz':
       return {
         name,
@@ -93,6 +120,20 @@ function build(name: string): Preset | null {
           ampCm: 0.8,
           noiseSdCm: 0.02,
           seed: 9,
+        }).frames,
+      }
+    case 'tremor-rest-5hz':
+      return {
+        name,
+        description:
+          '5 Hz pill-rolling rest tremor: thumb–index oscillation with the palm centroid only drifting',
+        frames: makeTremorFrames({
+          durationMs: TREMOR_DURATION,
+          ampCm: 0,
+          finger: { freqHz: 5, ampCm: 0.5 },
+          drift: { freqHz: 0.6, ampCm: 0.3 },
+          noiseSdCm: 0.02,
+          seed: 12,
         }).frames,
       }
     case 'rom-sweep-timed':
@@ -141,8 +182,11 @@ export const PRESET_NAMES = [
   'tap-slow',
   'fist-1p5hz',
   'pronosup-1hz',
+  'pronosup-forward',
   'rom-sweep-timed',
   'tremor-5hz',
+  'tremor-forward',
+  'tremor-rest-5hz',
   'angles-sweep',
 ] as const
 

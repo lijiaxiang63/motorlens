@@ -21,7 +21,7 @@ import {
   TREMOR_LIVE_Y_RANGE,
 } from '../../config'
 import { JOINT_IDS, JointTracker } from '../../metrics/angles'
-import { rawHandScale, ScaleSmoother, worldHandScale } from '../../metrics/kinematics'
+import { fitCmPerImageUnit, ScaleSmoother, worldHandScale } from '../../metrics/kinematics'
 import { TREMOR_CENTROID_LANDMARKS } from '../../metrics/tremor'
 import type { TestDefinition } from '../../protocol/definitions'
 import { TestSession, type Phase, type PositioningIssue } from '../../protocol/testSession'
@@ -62,7 +62,7 @@ export function RecordScreen({
 
   // One session per screen mount; refs survive StrictMode's double effects.
   const sessionRef = useRef<TestSession | null>(null)
-  sessionRef.current ??= new TestSession(def.durationMs, hand)
+  sessionRef.current ??= new TestSession(def.durationMs, hand, def.handScaleRange)
   const session = sessionRef.current
 
   const chartRef = useRef<StreamChartHandle>(null)
@@ -121,13 +121,14 @@ export function RecordScreen({
         }
         chartRef.current?.push(f.t, sum)
       } else if (f.landmarks) {
-        // Tremor: vertical centroid displacement vs the slow baseline, cm.
-        const rs = rawHandScale(f.landmarks, f.aspect)
-        if (rs < 1e-9) return
+        // Tremor: vertical centroid displacement vs the slow baseline, cm
+        // (same foreshortening-robust scale fit as the offline pipeline).
+        const cm = fitCmPerImageUnit(f.landmarks, f.world, f.aspect)
+        if (cm === null) return
         let cy = 0
         for (const i of TREMOR_CENTROID_LANDMARKS) cy += f.landmarks[i]!.y
         cy /= TREMOR_CENTROID_LANDMARKS.length
-        const cyCm = (cy * worldHandScale(f.world) * 100) / rs
+        const cyCm = cy * cm
         chartRef.current?.push(f.t, cyCm - ema!.push(f.t, cyCm))
       }
     })

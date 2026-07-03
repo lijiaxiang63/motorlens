@@ -18,6 +18,7 @@ import {
   TAP_FC_HZ,
   TAP_LIVE_Y_RANGE,
   TAP_TEST_MS,
+  TREMOR_HAND_SCALE_RANGE,
   TREMOR_TEST_MS,
 } from '../config'
 import { computeFistMetrics } from '../metrics/fist'
@@ -45,6 +46,9 @@ interface TestDefinitionBase {
   durationMs: number
   /** Landmark indices emphasized on the skeleton overlay during the test. */
   highlightLandmarks: readonly number[]
+  /** Framing-gate hand-scale range override (gateHandScale height units);
+   *  defaults to HAND_SCALE_RANGE inside TestSession when absent. */
+  handScaleRange?: readonly [number, number]
 }
 
 export interface CycleTestDefinition extends TestDefinitionBase {
@@ -126,9 +130,9 @@ export const PRONATION_SUPINATION: TestDefinition = {
   family: 'cycle',
   title: 'Pronation–Supination Test',
   description:
-    'Rotate your palm toward and away from the camera as big and as fast as you can, like turning a doorknob.',
+    'Extend your arm out in front of you with the palm down, then turn the palm up and down alternately as big and as fast as you can.',
   instructions:
-    'Rest your elbow on the table with the forearm upright, palm facing the camera. Rotate the palm away and back as far and as fast as possible until the timer ends.',
+    'Extend your arm out in front of your body with the palm down — angle the camera slightly above or below the hand, not exactly head-on. Turn the palm up and down as far and as fast as possible until the timer ends.',
   durationMs: PRONOSUP_TEST_MS,
   eventNoun: ['turn', 'turns'],
   signalLabel: 'Palm roll (°)',
@@ -165,9 +169,10 @@ export const TREMOR_POSTURAL: TestDefinition = {
   description:
     'Hold your arm outstretched with the hand open and fingers spread, keeping it as steady as you can.',
   instructions:
-    'Stretch your arm out toward the camera with the palm open and fingers spread. Hold the position as steadily as possible until the timer ends — do not grip or move on purpose.',
+    'Stretch your arm out in front of you with the palm down, wrist straight, fingers comfortably spread. Angle the camera slightly above or below the hand. Hold the position as steadily as possible until the timer ends — do not grip or move on purpose.',
   durationMs: TREMOR_TEST_MS,
   highlightLandmarks: [0, 5, 9, 13, 17],
+  handScaleRange: TREMOR_HAND_SCALE_RANGE,
   compute: computeTremorMetrics,
 }
 
@@ -178,10 +183,13 @@ export const TREMOR_REST: TestDefinition = {
   description:
     'Rest your hand completely — supported and relaxed — while the camera watches for involuntary movement.',
   instructions:
-    'Rest your forearm on the table or armrest so the hand hangs fully relaxed in view of the camera. Let the hand go loose and keep it at rest until the timer ends.',
+    'Sit relaxed with the hand resting on the armrest or table, fully at rest. Aim the camera at the resting hand and frame it closely — small tremor needs the hand large in view. Keep the hand loose until the timer ends.',
   durationMs: TREMOR_TEST_MS,
-  highlightLandmarks: [0, 5, 9, 13, 17],
-  compute: computeTremorMetrics,
+  highlightLandmarks: [0, 4, 5, 8, 9, 13, 17],
+  handScaleRange: TREMOR_HAND_SCALE_RANGE,
+  // Rest tremor is classically pill-rolling: the thumb–index world-distance
+  // channel catches it where the finger-free palm centroid cannot.
+  compute: (frames) => computeTremorMetrics(frames, { fingerChannel: true }),
 }
 
 export const TEST_DEFS: TestDefinition[] = [

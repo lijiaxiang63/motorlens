@@ -269,25 +269,53 @@ export interface PronosupGenOpts extends CycleGenOpts {
    *  the measured roll inside (−180, 180]; pass e.g. 100 to force the
    *  wrapped signal across the ±180° boundary (unwrap stress test). */
   rollOffsetDeg?: number
+  /** 'upright' (default): forearm vertical, elbow-on-table — rotation about
+   *  the camera's y axis. 'forward': arm extended toward the camera —
+   *  rotation about the forearm axis, which sits tiltDeg off the optical
+   *  axis (the camera slightly above/below the hand, as instructed). */
+  posture?: 'upright' | 'forward'
+  /** Forward posture only: forearm angle off the optical axis, degrees. */
+  tiltDeg?: number
 }
 
 /** Pronation-supination frames: the whole neutral template rigidly rotated
- *  about the vertical (y) axis through the wrist. W9 = (0, −0.08, 0) lies on
- *  that axis, so |W0−W9| is preserved exactly in both world and projected
- *  space — hand scale cannot leak into the measured amplitude.
+ *  about its own long axis (template y) through the wrist, then — in the
+ *  'forward' posture — the whole arm tipped toward the camera about x.
+ *  W9 = (0, −0.08, 0) lies on the rotation axis, so |W0−W9| is preserved
+ *  exactly in world space (and rawHandScale stays constant per posture) —
+ *  hand scale cannot leak into the measured amplitude.
  *
- *  Geometry: the flat template's palm normal gives roll φ = 90° − θ for a
- *  rotation by θ. apply() rotates by θ = 50 − d, so the measured roll is
- *  40 + d (+ rollOffsetDeg): schedule closures (d minima) are roll MINIMA,
- *  aligning detected events with truth.eventTimesMs, and peak-to-valley roll
- *  amplitude equals the scheduled amplitude in degrees exactly. Defaults
- *  d ∈ [10, 90] → roll ∈ [50, 130]° and rotation ∈ [−40, +40]°, safely away
- *  from the ±180° wrap and the generate() positivity clamp. */
+ *  Geometry: in BOTH postures the measured roll is 40 + d (+ rollOffsetDeg)
+ *  exactly (upright: roll = −θ with θ = −(40+d+offset); forward: roll =
+ *  180° − θ with θ = 140−d−offset, independent of tiltDeg). Schedule
+ *  closures (d minima) are therefore roll MINIMA, aligning detected events
+ *  with truth.eventTimesMs, and peak-to-valley roll amplitude equals the
+ *  scheduled amplitude in degrees exactly. Defaults d ∈ [10, 90] →
+ *  roll ∈ [50, 130]°, safely away from the ±180° wrap and the generate()
+ *  positivity clamp. */
 export function makePronosupFrames(opts: PronosupGenOpts = {}): CycleGenResult {
   const o = withDefaults(opts, 90, 10)
   const offset = opts.rollOffsetDeg ?? 0
+  if ((opts.posture ?? 'upright') === 'forward') {
+    // Tip angle from upright: 90° − tilt-off-optical-axis.
+    const alpha = ((90 - (opts.tiltDeg ?? 20)) * Math.PI) / 180
+    const ca = Math.cos(alpha)
+    const sa = Math.sin(alpha)
+    return generate(o, (d) => {
+      const theta = ((140 - d - offset) * Math.PI) / 180
+      const ct = Math.cos(theta)
+      const st = Math.sin(theta)
+      return HAND_TEMPLATE.map((p) => {
+        // Roll about the template's own long axis (y)…
+        const x = p.x * ct + p.z * st
+        const z = -p.x * st + p.z * ct
+        // …then tip the whole arm toward the camera (about x).
+        return { x, y: p.y * ca - z * sa, z: p.y * sa + z * ca }
+      })
+    })
+  }
   return generate(o, (d) => {
-    const theta = ((50 - d - offset) * Math.PI) / 180
+    const theta = (-(40 + d + offset) * Math.PI) / 180
     const cos = Math.cos(theta)
     const sin = Math.sin(theta)
     return HAND_TEMPLATE.map((p) => ({
@@ -309,8 +337,22 @@ export interface TremorGenOpts {
   secondary?: { freqHz: number; ampCm: number }
   /** Slow postural drift (a tremor-free hand sways below the band). */
   drift?: { freqHz: number; ampCm: number }
+  /** Pill-rolling component (rest tremor): thumb and index TIPS oscillate
+   *  symmetrically along their separation axis so the world thumb–index
+   *  distance swings by ±ampCm — strictly invisible to the palm centroid
+   *  [0,5,9,13,17], which excludes both fingertips. */
+  finger?: { freqHz: number; ampCm: number }
   /** White noise per axis, cm. */
   noiseSdCm?: number
+  /** 'facing' (default): flat hand facing the camera. 'forward': the
+   *  postural-tremor posture — arm extended toward the camera, the whole
+   *  hand tipped so it sits tiltDeg off the optical axis. The wrist→
+   *  middle-MCP segment foreshortens in image space while the true hand
+   *  size is unchanged, which used to inflate the projected-segment cm
+   *  conversion several-fold. */
+  posture?: 'facing' | 'forward'
+  /** Forward posture only: hand angle off the optical axis, degrees. */
+  tiltDeg?: number
   durationMs?: number
   fps?: number
   dropouts?: { atMs: number; durMs: number }[]
@@ -323,13 +365,16 @@ export interface TremorGenResult {
   truth: { freqHz: number; ampCm: number; rmsCm: number }
 }
 
-/** Tremor frames: the WORLD landmarks stay the untranslated neutral template
+/** Tremor frames: the WORLD landmarks stay an untranslated rigid template
  *  (hand-centered, exactly like real MediaPipe world coordinates — whole-hand
  *  translation is invisible there); only the projected image landmarks
- *  translate. Displacement is defined in aspect-corrected image units so the
- *  analyzer's cm conversion (worldScale·100/rawScale = exactly 100 for this
- *  template) recovers ampCm exactly. truth.rmsCm covers primary + secondary
- *  tones (each tone contributes amp²/2 to the variance). */
+ *  translate. Displacement is defined in aspect-corrected image units, and
+ *  the image landmarks are an exact in-plane copy of the world x/y (1 unit =
+ *  1 m = 100 cm), so the analyzer's least-squares cm conversion recovers
+ *  ampCm exactly — in the 'forward' posture too, where the projected
+ *  wrist→middle-MCP segment shrinks ~3× and a segment-ratio conversion
+ *  would inflate cm by the same factor. truth.rmsCm covers primary +
+ *  secondary tones (each tone contributes amp²/2 to the variance). */
 export function makeTremorFrames(opts: TremorGenOpts = {}): TremorGenResult {
   const freqHz = opts.freqHz ?? 5
   const ampCm = opts.ampCm ?? 0.8
@@ -339,7 +384,13 @@ export function makeTremorFrames(opts: TremorGenOpts = {}): TremorGenResult {
   const noiseSdCm = opts.noiseSdCm ?? 0
   const handedness = opts.handedness ?? ('right' as Hand)
   const noise = gaussian(mulberry32((opts.seed ?? 1) + 104_729))
-  const world = HAND_TEMPLATE.map((p) => ({ ...p }))
+  // Tip angle from upright: 0 for the flat facing template, 90° − tilt for
+  // the arm-extended-toward-camera posture (same convention as pron-sup).
+  const alpha =
+    (opts.posture ?? 'facing') === 'forward' ? ((90 - (opts.tiltDeg ?? 20)) * Math.PI) / 180 : 0
+  const ca = Math.cos(alpha)
+  const sa = Math.sin(alpha)
+  const world = HAND_TEMPLATE.map((p) => ({ x: p.x, y: p.y * ca - p.z * sa, z: p.y * sa + p.z * ca }))
   const frames: LandmarkFrame[] = []
   const dt = 1000 / fps
   for (let tMs = 0; tMs < durationMs; tMs += dt) {
@@ -352,20 +403,38 @@ export function makeTremorFrames(opts: TremorGenOpts = {}): TremorGenResult {
     let s = ampCm * Math.sin(2 * Math.PI * freqHz * tS)
     if (opts.secondary) s += opts.secondary.ampCm * Math.sin(2 * Math.PI * opts.secondary.freqHz * tS)
     if (opts.drift) s += opts.drift.ampCm * Math.sin(2 * Math.PI * opts.drift.freqHz * tS)
+    // Pill-rolling: displace tips 4 and 8 by ∓half the separation swing so
+    // |W4−W8| changes by finger.ampCm·sin(·) cm exactly (world AND image).
+    let w = world
+    if (opts.finger) {
+      const half = ((opts.finger.ampCm / 2) * Math.sin(2 * Math.PI * opts.finger.freqHz * tS)) / 100
+      w = world.map((p) => ({ ...p }))
+      const t4 = w[4]!
+      const t8 = w[8]!
+      const sx = t8.x - t4.x
+      const sy = t8.y - t4.y
+      const sz = t8.z - t4.z
+      const len = Math.hypot(sx, sy, sz)
+      w[4] = { x: t4.x - (sx / len) * half, y: t4.y - (sy / len) * half, z: t4.z - (sz / len) * half }
+      w[8] = { x: t8.x + (sx / len) * half, y: t8.y + (sy / len) * half, z: t8.z + (sz / len) * half }
+    }
     // Aspect-corrected image-unit displacement (1 unit = 100 cm here).
     const dx = (s * Math.cos(axis) + noiseSdCm * noise()) / 100
     const dy = (s * Math.sin(axis) + noiseSdCm * noise()) / 100
-    const landmarks = world.map((w) => ({
-      x: 0.5 + (w.x + dx) / SYNTH_ASPECT,
-      y: 0.55 + w.y + dy,
-      z: w.z / SYNTH_ASPECT,
+    const landmarks = w.map((p) => ({
+      x: 0.5 + (p.x + dx) / SYNTH_ASPECT,
+      y: 0.55 + p.y + dy,
+      z: p.z / SYNTH_ASPECT,
     }))
-    frames.push({ t: tMs, landmarks, world, handedness, score: 1, aspect: SYNTH_ASPECT })
+    frames.push({ t: tMs, landmarks, world: w, handedness, score: 1, aspect: SYNTH_ASPECT })
   }
   const secondaryVar = opts.secondary ? opts.secondary.ampCm ** 2 / 2 : 0
+  const fingerVar = opts.finger ? opts.finger.ampCm ** 2 / 2 : 0
   return {
     frames,
-    truth: { freqHz, ampCm, rmsCm: Math.sqrt(ampCm ** 2 / 2 + secondaryVar) },
+    // Combined-channel RMS: each tone contributes amp²/2 to the variance
+    // (the finger tone only when the analyzer's finger channel is on).
+    truth: { freqHz, ampCm, rmsCm: Math.sqrt(ampCm ** 2 / 2 + secondaryVar + fingerVar) },
   }
 }
 

@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { computePronosupMetrics } from '../metrics/pronosup'
 import { computeTapMetrics } from '../metrics/taps'
-import { makePronosupFrames, makeTapFrames } from '../replay/synthetic'
-import type { ReportSource, ReportSubject } from '../types'
+import { computeTremorMetrics } from '../metrics/tremor'
+import { makePronosupFrames, makeTapFrames, makeTremorFrames } from '../replay/synthetic'
+import type { ReportSource, ReportSubject, TremorMetrics } from '../types'
 import { buildSessionReport, parseSessionJson, reportFileName } from './export'
 
 const startedAt = '2026-07-02T10:15:02.000Z'
@@ -84,6 +85,33 @@ describe('session report round-trip', () => {
       6,
     )
     expect(re.metrics.cmPerUnit).toBeNull()
+  })
+
+  it('recomputes identical rest-tremor metrics from exported raw frames', () => {
+    // The finger channel reads thumb–index distances off the 4-dp-rounded
+    // world coordinates; the centroid channels ride the LS cm fit. Dominant
+    // frequency must land on the identical PSD bin; amplitudes to ~1%.
+    const { frames } = makeTremorFrames({
+      ampCm: 0.3,
+      finger: { freqHz: 5, ampCm: 0.5 },
+      durationMs: 8_000,
+    })
+    const compute = (fs: typeof frames) => computeTremorMetrics(fs, { fingerChannel: true })
+    const report = buildSessionReport({
+      test: 'tremor_rest',
+      hand: 'right',
+      startedAt,
+      durationMs: 8_000,
+      analysis: compute(frames),
+      frames,
+    })
+    const parsed = parseSessionJson(JSON.stringify(report))
+    const re = compute(parsed.raw.frames)
+    const m = report.metrics as TremorMetrics
+    expect(re.metrics.dominantFreqHz).toBeCloseTo(m.dominantFreqHz!, 6)
+    expect(
+      Math.abs(re.metrics.rmsAmplitudeCm! - m.rmsAmplitudeCm!) / m.rmsAmplitudeCm!,
+    ).toBeLessThan(0.01)
   })
 
   it('derives a stable filename from test, hand, and start time', () => {

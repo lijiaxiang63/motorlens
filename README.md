@@ -21,7 +21,7 @@ speed, amplitude decrement, rhythm variability, and per-joint flexion angles.
 |---|---|---|
 | **Finger Tapping** (10 s/hand) | Tap index fingertip against thumb tip, as big and fast as possible | Tap count, frequency, amplitude, opening/closing speed, amplitude & velocity decrement, rhythm CV, hesitations |
 | **Fist Open–Close** (10 s/hand) | Open the hand fully, clench into a fist, repeat | Cycle count, frequency, aperture amplitude, clench/open speed, decrement, rhythm |
-| **Pronation–Supination** (10 s/hand) | Rotate the palm toward/away from the camera, elbow on the table | Turn count, frequency, rotation amplitude in degrees, pronation/supination speed, decrement, rhythm |
+| **Pronation–Supination** (10 s/hand) | Arm extended out in front, palm down; turn the palm up and down alternately | Turn count, frequency, rotation amplitude in degrees, pronation/supination speed, decrement, rhythm |
 | **Range of Motion** (10 s/hand) | Slowly open the hand flat, then curl into a full fist, repeatedly | Per-joint and per-finger ROM (°), total active ROM, peak angular velocity |
 | **Postural / Rest Tremor** (15 s/hand) | Hold the hand outstretched (postural) or fully relaxed (rest) | Dominant tremor frequency (3–12 Hz), RMS & peak displacement in cm, tremor index, per-axis share |
 | **Joint Monitor** (live) | Move freely | Flexion angle, min/max, range of motion, and peak angular velocity for all 15 finger joints |
@@ -176,10 +176,10 @@ palm length; `S` in cm gives the secondary `≈ cm` values (typical adult
 | Decrement | Linear-regression decline across events as % of starting value (positive = fatiguing); a first-third vs last-third comparison is reported alongside |
 | Rhythm variability | Coefficient of variation of inter-event intervals |
 | Hesitation | Interval > max(2 × median interval, 0.4 s tap / 0.7 s fist & pron-sup) |
-| Signal (pron-sup) | Palm-roll angle in degrees from the world-landmark palm normal, unwrapped — no hand-scale normalization (rotation is scale-free) |
+| Signal (pron-sup) | Palm-roll angle in degrees: the world-landmark palm normal's rotation about the wrist→middle-MCP axis (posture-adaptive — works forearm-upright or arm-extended-toward-camera), unwrapped — no hand-scale normalization (rotation is scale-free) |
 | Joint flexion | 180° − interior angle at the joint from 3-D world landmarks (0° = straight) |
 | Total active ROM | Sum of the 15 per-joint flexion ranges over the timed recording, ° |
-| Tremor displacement | Image-space palm-centroid motion converted to cm (world landmarks are hand-centered and cannot see whole-hand translation), detrended per tracking run |
+| Tremor displacement | Image-space palm-centroid motion converted to cm via a least-squares in-plane world↔image scale fit over all 21 landmarks (robust to foreshortening when the arm points at the camera; world landmarks are hand-centered and cannot see whole-hand translation), detrended per tracking run. The rest test adds a thumb–index world-distance channel for pill-rolling tremor, which barely moves the palm centroid. Fore-aft motion along the camera axis is invisible to a single camera — amplitudes cover in-plane motion only |
 | Tremor frequency / index | Dominant bin of the Welch power spectrum in the 3–12 Hz band; index = % of 0.5–15 Hz power inside that band |
 
 Recording quality (fps, % frames with a detected hand, camera-distance
@@ -197,8 +197,11 @@ http://localhost:5173/?source=synthetic&preset=tap-2hz&speed=4
 ```
 
 Presets: `tap-2hz`, `tap-decrement`, `tap-hesitant`, `tap-slow`,
-`fist-1p5hz`, `pronosup-1hz`, `rom-sweep-timed`, `tremor-5hz`,
-`angles-sweep`. `speed` accelerates playback without changing the measured
+`fist-1p5hz`, `pronosup-1hz`, `pronosup-forward`, `rom-sweep-timed`,
+`tremor-5hz`, `tremor-forward`, `tremor-rest-5hz`, `angles-sweep` (the
+`-forward` variants replay the arm-extended-toward-camera posture with a
+foreshortened hand; `tremor-rest-5hz` is a pill-rolling rest tremor whose
+palm centroid only drifts). `speed` accelerates playback without changing the measured
 values. Dropping an exported session JSON onto the home screen re-analyzes
 its raw frames and reproduces the original results.
 
@@ -227,17 +230,23 @@ npm run build
 6. Fist test: 8 full open–close cycles → count 8.
 7. Joint Monitor: straight fingers read < ~15°, a full fist puts PIP joints
    around 90–110°, ROM accumulates, Reset works.
-8. Pronation–supination: elbow on the table, rotate the palm through ~8 slow
-   full turns → count ≈ 8, amplitude in a plausible degree range for your
-   rotation (a quarter turn ≈ 90°); the live chart's wrapped roll may jump
-   at ±180° — the computed amplitude must not.
+8. Pronation–supination: arm extended out in front, palm down, camera angled
+   slightly above or below the hand; turn the palm up and down through ~8
+   slow full turns → count ≈ 8, amplitude in a plausible degree range for
+   your rotation (a half turn ≈ 180°); the live chart's wrapped roll may
+   jump at ±180° — the computed amplitude must not. Repeat with the left
+   hand and sanity-check the roll direction/offset there too.
 9. Range of Motion: 2–3 slow full open→fist sweeps → index/middle finger
    ROMs ≳ 180°, total active ROM in the several-hundred-degree range,
    per-joint table plausible.
-10. Tremor (postural): hold the hand outstretched as still as you can →
-    low tremor index with the low-confidence banner; then deliberately shake
-    the hand at a steady small amplitude → a clear dominant frequency and a
-    peaked spectrum in the 3–12 Hz band. Repeat with the hand at rest.
+10. Tremor (postural): arm out in front, palm down, held as still as you
+    can → low tremor index with the low-confidence banner; then deliberately
+    shake the hand at a steady small amplitude → a clear dominant frequency
+    and a peaked spectrum in the 3–12 Hz band. Rest test: hand relaxed on
+    the armrest/table, camera framing the hand closely → quiet hand reads
+    low-confidence; a deliberate slow thumb-rub against the fingertips
+    (pill-rolling-like) shows up with a clear dominant frequency even though
+    the hand as a whole barely moves.
 11. Export JSON from a result, drag it back onto home → identical metrics.
 
 > **Platform caveat** — the checklist above (and `SWAP_RAW_HANDEDNESS` in

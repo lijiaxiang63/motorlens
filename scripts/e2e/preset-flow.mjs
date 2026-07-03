@@ -30,6 +30,7 @@ const CARD_TITLES = [
   ['fist', 'Fist Open–Close Test'],
   ['pronosup', 'Pronation–Supination Test'],
   ['rom', 'Range of Motion Test'],
+  ['tremor-rest', 'Rest Tremor Test'], // before the 'tremor' prefix
   ['tremor', 'Postural Tremor Test'],
   ['tap', 'Finger Tapping Test'],
 ]

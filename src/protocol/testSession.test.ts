@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { makeTapFrames } from '../replay/synthetic'
+import { rawHandScale } from '../metrics/kinematics'
+import { makePronosupFrames, makeTapFrames } from '../replay/synthetic'
 import type { LandmarkFrame } from '../types'
 import { TestSession, type Phase } from './testSession'
 
@@ -58,6 +59,37 @@ describe('TestSession', () => {
     const session = new TestSession(10_000, 'right')
     for (const f of frames) session.onFrame(f)
     expect(session.current.kind).toBe('done')
+  })
+
+  it('passes the framing gate with the arm extended toward the camera', () => {
+    const { frames } = makePronosupFrames({ posture: 'forward', durationMs: 16_000 })
+    // Premise of the regression: the palm length alone is ~3× foreshortened
+    // in this posture — its mean sits below the 0.06 floor, so a gate
+    // measuring only |P0−P9| held the clinical arm-extended posture at
+    // 'too_far' forever. The knuckle line keeps gateHandScale in range.
+    const detected = frames.filter((f) => f.landmarks)
+    const palmMean =
+      detected.reduce((s, f) => s + rawHandScale(f.landmarks!, f.aspect), 0) / detected.length
+    expect(palmMean).toBeLessThan(0.06)
+
+    const session = new TestSession(10_000, 'right')
+    for (const f of frames) session.onFrame(f)
+    expect(session.current.kind).toBe('done')
+  })
+
+  it('honors a per-test hand-scale range', () => {
+    const { frames } = makeTapFrames({ durationMs: 3_000 })
+    const strict = new TestSession(10_000, 'right', [0.2, 0.5])
+    for (const f of frames) strict.onFrame(f)
+    const p = strict.current
+    expect(p.kind).toBe('positioning')
+    if (p.kind === 'positioning') expect(p.issues).toContain('too_far')
+
+    const close = new TestSession(10_000, 'right', [0.01, 0.05])
+    for (const f of frames) close.onFrame(f)
+    const q = close.current
+    expect(q.kind).toBe('positioning')
+    if (q.kind === 'positioning') expect(q.issues).toContain('too_close')
   })
 
   it('cancel is terminal', () => {
