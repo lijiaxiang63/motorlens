@@ -70,6 +70,7 @@ export function PreviewPanel({
         drawHand(g, frame.landmarks, w, hgt, {
           mirror: source.kind === 'camera',
           highlight: highlightRef.current,
+          aspect: frame.aspect,
         })
       }
     }
